@@ -10,12 +10,16 @@ from loadDataset import LoadDataset
 import sklearn.preprocessing as labelEncoder
 from dataset import FcgSampler
 from graphSAGE import SAGE
-from torch.utils.data import DataLoader
+from torch_geometric.loader import DataLoader # !
 from loss import ProtoLoss
+from datetime import datetime
+from utils import save_checkpoint, save_config, record_log, save_model_architecture
 
+
+def collate_graphs(batch):
+    return Batch.from_data_list(batch)
 
 class TrainModule():
-
     def __init__(self, opt: dict, dataset: LoadDataset):
         self.dataset = dataset
         self.nodeEmbedding = opt["settings"]["vectorize"]["node_embedding_method"]
@@ -32,10 +36,18 @@ class TrainModule():
         self.input_size = opt["settings"]["model"]["input_size"]
         self.hidden_size = opt["settings"]["model"]["hidden_size"]
         self.output_size = opt["settings"]["model"]["output_size"]
+        self.embeddingSize = opt["settings"]["vectorize"]["node_embedding_size"]
+
 
         self.method = opt["settings"]["few_shot"]["method"]
-        self.support_shots = opt["settings"]["few_shot"]["train"]["support_shots"]
-        self.class_per_iter = opt["settings"]["few_shot"]["train"]["class_per_iter"]
+        self.support_shots_train = opt["settings"]["few_shot"]["train"]["support_shots"]
+        self.query_shots_train = opt["settings"]["few_shot"]["train"]["query_shots"]
+        self.class_per_iter_train = opt["settings"]["few_shot"]["train"]["class_per_iter"]
+
+        self.support_shots_test = opt["settings"]["few_shot"]["test"]["support_shots"]
+        self.query_shots_test = opt["settings"]["few_shot"]["test"]["query_shots"]
+        self.class_per_iter_test = opt["settings"]["few_shot"]["test"]["class_per_iter"]
+
         self.iterations = opt["settings"]["train"]["iterations"]
         self.cuda = opt["settings"]["train"]["device"]
         self.training = opt["settings"]["train"]["training"]
@@ -45,7 +57,12 @@ class TrainModule():
         self.epochs = opt["settings"]["train"]["num_epochs"]
         self.iterations = opt["settings"]["train"]["iterations"]
         self.save_model = opt["settings"]["train"]["save_model"]
-        self.model_path = opt["paths"]["data"]["model_folder"]
+        self.early_stopping = opt["settings"]["train"]["early_stopping"]["use"]
+        self.early_stopping_patience = opt["settings"]["train"]["early_stopping"]["patience"]
+        now = datetime.now()
+        self.model_folder = opt["paths"]["data"]["model_folder"] + "/" + opt["settings"]["name"] + "_" + now.strftime("%Y%m%d_%H%M")
+        self.log_file = self.model_folder + "/log.txt"
+
 
         self.seed = opt["settings"]["seed"]
         self.parallel = opt["settings"]["train"]["parallel"]
@@ -61,6 +78,11 @@ class TrainModule():
             filePath = f"{self.embeddingFolder}/{cpu}/{family}/{fileName}.gpickle"
             with open(filePath, "rb") as f:
                 fcg = pickle.load(f)
+            for node in fcg.nodes:
+                if not isinstance(fcg.nodes[node]["x"], torch.Tensor):
+                    fcg.nodes[node]["x"] = torch.tensor(fcg.nodes[node]["x"], dtype=torch.float)
+                if len(fcg.nodes[node]["x"]) == 0:
+                    fcg.nodes[node]["x"] = torch.zeros(self.embeddingSize)
             torch_data = from_networkx(fcg)
             labels.append(family)
             graphList.append(torch_data)
@@ -69,6 +91,7 @@ class TrainModule():
         labels_ = le.transform(labels)
         for i, data in enumerate(graphList):
             data.y = torch.tensor(labels_[i])
+            # data.num_nodes = len(data.x)
         
         return graphList, labels_
 
@@ -94,13 +117,13 @@ class TrainModule():
         print(f"Loading data from {self.embeddingFolder}...")
         print("Loading training data...")
         self.trainGraph, label = self.load_GE_data(self.trainDataset)
-        sampler = FcgSampler(label, self.support_shots, self.class_per_iter, self.iterations)
-        self.trainLoader = DataLoader(self.trainGraph, batch_sampler=sampler, num_workers=4)    
+        sampler = FcgSampler(label, self.support_shots_train + self.query_shots_train, self.class_per_iter_train, self.iterations)
+        self.trainLoader = DataLoader(self.trainGraph, batch_sampler=sampler, num_workers=4, collate_fn=collate_graphs)    
         if self.valDataset is not None:
             print("Loading validation data...")
             self.valGraph, label = self.load_GE_data(self.valDataset)
-            val_sampler = FcgSampler(label, self.support_shots, self.class_per_iter, self.iterations)
-            self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4)
+            val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
+            self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4, collate_fn=collate_graphs)
         else:
             self.valLoader = None
         self.model = self.get_model()
@@ -119,7 +142,23 @@ class TrainModule():
         
         print("Finish setting up the training module")
 
+    def end_of_epoch(self, avg_acc, best_acc, epoch, patience):
 
+        if avg_acc >= best_acc:
+            best_acc = avg_acc
+            if self.save_model:
+                save_checkpoint(state=self.model.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder)
+            if self.early_stopping:
+                patience = 0
+        else:
+            if self.early_stopping:
+                patience += 1
+                if patience == self.early_stopping_patience:
+                    print("Early stopping")
+                    record_log(self.log_file, "Early stopping in epoch {}\n", format(epoch+1))
+                    
+                    return best_acc, patience, True
+        return best_acc, patience, False
 
     def train(self):
         print("Start to train...")
@@ -130,56 +169,61 @@ class TrainModule():
         val_acc = []
         best_train_acc = 0
         best_val_acc = 0
+        patience = 0
+        stop = False
+
+        os.makedirs(self.model_folder, exist_ok=True)
+        # save config
+        save_config(self.opt, self.model_folder + "/config.json")
+        # save model architecture
+        save_model_architecture(self.model, self.model_folder + "/model_architecture.txt")
 
         for epoch in range(self.epochs):
-            print('====== Epoch: {} ======'.format(epoch))
+            # print('====== Epoch: {} ======'.format(epoch))
             self.model.train()
-            for i, (data, labels) in enumerate(self.trainLoader):
-                self.optim.zero_grad()
-                data = data.squeeze(1)
-                data = data.float()
-                data = data.to(self.device)
-                labels = labels.to(self.device)
-                embeddings = self.model(data)
-                loss, acc = self.loss_fn(embeddings, labels)
-                loss.backward()
-                self.optim.step()   
-                train_loss.append(loss.item())
-                train_acc.append(acc.item()) 
-            if self.lr_scheduler["use"]:
-                self.scheduler.step()
-            avg_loss = np.mean(train_loss[-(self.iterations):])
-            avg_acc = np.mean(train_acc[-(self.iterations):])
-            postfix = ' (Best)' if avg_acc >= best_train_acc else ' (Best: {})'.format(best_train_acc)
-            print('Avg Train Loss: {}, Avg Train Acc: {}{}'.format(avg_loss, avg_acc, postfix))
+            with tqdm(self.trainLoader, desc="Epoch {} in Training".format(epoch+1)) as pbar:
+                for data in pbar:
+                    self.optim.zero_grad()
+                    data = data.to(self.device)
+                    embeddings = self.model(data.x , data.edge_index, data.batch)
+                    loss, acc = self.loss_fn(embeddings, data.y)
+                    loss.backward()
+                    self.optim.step()   
+                    train_loss.append(loss.item())
+                    train_acc.append(acc.item()) 
+                if self.lr_scheduler["use"]:
+                    self.scheduler.step()
+                avg_loss = np.mean(train_loss[-(self.iterations):])
+                avg_acc = np.mean(train_acc[-(self.iterations):])
+                postfix = ' (Best)' if avg_acc >= best_train_acc else ' (Best: {})'.format(best_train_acc)
+                content = 'Avg Train Loss: {}, Avg Train Acc: {}{}'.format(avg_loss, avg_acc, postfix)
+                print(content)
+                record_log(self.log_file, "Epoch {}: {}\n".format(epoch+1, content))
             if self.valLoader is not None: 
                 self.model.eval()
-                for i, (data, labels) in enumerate(self.valLoader):
-                    data = data.squeeze(1)
-                    data = data.float()
-                    data = data.to(self.device)
-                    labels = labels.to(self.device)
-                    model_output = self.model(data)
-                    loss, acc= self.loss_fn(embeddings, labels)
-                    val_loss.append(loss.item())
-                    val_acc.append(acc.item())
-                avg_loss = np.mean(val_loss[-(self.iterations):])
-                avg_acc = np.mean(val_acc[-(self.iterations):])
-                postfix = ' (Best)' if avg_acc >= best_val_acc else ' (Best: {})'.format(best_val_acc)
-                print('Avg Val Loss: {}, Avg Val Acc: {}{}'.format(avg_loss, avg_acc, postfix))
-                if avg_acc >= best_val_acc:
-                    best_val_acc = avg_acc
-                    best_train_acc = avg_acc
-                    if avg_acc >= best_train_acc:
-                        best_train_acc = avg_acc
-                    if self.save_model:
-                        torch.save(self.model.state_dict(), self.model_path)
+                with tqdm(self.valLoader, desc="Epoch {} in Validate".format(epoch+1)) as pbar:
+                    for data in pbar:
+                        data = data.to(self.device)
+                        model_output = self.model(data.x, data.edge_index, data.batch)
+                        loss, acc= self.loss_fn(model_output, data.y)
+                        val_loss.append(loss.item())
+                        val_acc.append(acc.item())
+                    avg_loss = np.mean(val_loss[-(self.iterations):])
+                    avg_acc = np.mean(val_acc[-(self.iterations):])
+                    postfix = ' (Best)' if avg_acc >= best_val_acc else ' (Best: {})'.format(best_val_acc)
+                    content = 'Avg Val Loss: {}, Avg Val Acc: {}{}'.format(avg_loss, avg_acc, postfix)
+                    print(content)
+                    record_log(self.log_file, "Epoch {}: {}\n".format(epoch+1, content))
+                best_val_acc, patience, stop = self.end_of_epoch(avg_acc, best_val_acc, epoch, patience)
             else:
-                if avg_acc >= best_train_acc:
-                    best_train_acc = avg_acc
-                    if self.save_model:
-                        torch.save(self.model.state_dict(), self.model_path)
+                best_train_acc, patience, stop = self.end_of_epoch(avg_acc, best_train_acc, epoch, patience)
             
+            if self.save_model and epoch % 10 == 0:
+                save_checkpoint(state=self.model.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder)
             
+            if stop:
+                break
+
+
         print("Finish training")
         return True

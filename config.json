@@ -6,6 +6,7 @@
         "split_by_cpu": false
     },
     "settings":{
+        "name": "x86_proto",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
@@ -15,10 +16,10 @@
         "train": {
             "training": true,
             "validation": true,
-            "num_epochs": 100,
-            "device": "cuda:0",
-            "parallel": false,
-            "parallel_device": [0, 1],
+            "num_epochs": 500,
+            "device": "cuda:0", 
+            "parallel": true,
+            "parallel_device": [0, 1, 2, 3],
             "iterations": 100,
             "lr": 0.001,
             "lr_scheduler": {
@@ -27,7 +28,11 @@
                 "step_size": 20,
                 "gamma": 0.5
             },
-            "loss": "distances",
+            "early_stopping": {
+                "use": true,
+                "patience": 50
+            },
+            "loss": "euclidean",
             "optimizer": "Adam",
             "save_model": true
         },

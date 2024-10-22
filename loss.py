@@ -39,6 +39,7 @@ class ProtoLoss:
         target_cpu = target.cpu()
         input_cpu = input.cpu()
 
+
         def supp_idxs(c):
             return target_cpu.eq(c).nonzero()[:n_support].squeeze(1)
 
@@ -53,6 +54,7 @@ class ProtoLoss:
 
         query_samples = input.to('cpu')[query_idxs]
         dists = euclidean_dist(query_samples, prototypes)
+ 
         log_p_y = F.log_softmax(-dists, dim=1).view(n_classes, n_query, -1)
         target_inds = torch.arange(0, n_classes)
         target_inds = target_inds.view(n_classes, 1, 1)
@@ -67,4 +69,4 @@ class ProtoLoss:
         
         acc_val = y_hat.eq(target_inds.squeeze(2)).float().mean()
         
-        return loss_val,  acc_val
+        return loss_val, acc_val

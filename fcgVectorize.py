@@ -5,6 +5,7 @@ import pickle
 import os   
 from gensim.models import Word2Vec
 import sklearn.preprocessing as labelEncoder
+import torch
 
 class FCGVectorize():
     def __init__(self, opt: dict, dataset: LoadDataset):
@@ -42,7 +43,8 @@ class FCGVectorize():
                             avgOpcodeEmbedding = [0] * self.embeddingSize
                             continue
                         opcodeEmbedding = model.wv[opcode]
-                        avgOpcodeEmbedding = opcodeEmbedding.mean(axis=0)
+                        opcodeEmbedding = torch.tensor(opcodeEmbedding)
+                        avgOpcodeEmbedding = torch.mean(opcodeEmbedding, dim=0)
                         fcg.nodes[node]["x"] = avgOpcodeEmbedding
                 if not os.path.exists(f"{self.embeddingFolder}/{cpu}/{family}"):
                     os.makedirs(f"{self.embeddingFolder}/{cpu}/{family}")
