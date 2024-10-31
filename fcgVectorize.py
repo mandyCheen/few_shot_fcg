@@ -15,7 +15,8 @@ class FCGVectorize():
         self.trainDataset = dataset.trainData
         self.testDataset = dataset.testData 
         self.valDataset = dataset.valData
-        self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], self.nodeEmbedding)
+        self.datasetName = opt
+        self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], dataset.datasetName, self.nodeEmbedding)
         self.embeddingSize = opt["settings"]["vectorize"]["node_embedding_size"]
         self.numWorkers = opt["settings"]["vectorize"]["num_workers"]
         if not os.path.exists(self.embeddingFolder):

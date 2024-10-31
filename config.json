@@ -2,7 +2,8 @@
     "dataset": {
         "pack_filter": "diec",
         "cpu_arch": "x86_64",
-        "raw": "malware_diec_x86_64_fcg_dataset.csv",
+        "reverse_tool": "r2",
+        "raw": "malware_diec_r2_x86_64_fcg_dataset.csv",
         "split_by_cpu": false
     },
     "settings":{
@@ -13,12 +14,16 @@
             "hidden_size": 128,
             "output_size": 128
         },
+        "pretrian": {
+            "use": true,
+            "model_name": "GraphSAGE"
+        },
         "train": {
             "training": true,
             "validation": true,
             "num_epochs": 500,
             "device": "cuda:0", 
-            "parallel": true,
+            "parallel": false,
             "parallel_device": [0, 1, 2, 3],
             "iterations": 100,
             "lr": 0.001,
@@ -62,7 +67,8 @@
             "csv_folder": "./dataset/raw_csv",
             "split_folder": "./dataset/split",
             "model_folder": "./models",
-            "embedding_folder": "./embeddings"
+            "embedding_folder": "./embeddings",
+            "pretrained_folder": "./pretrained"
         }
     }
 

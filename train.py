@@ -23,7 +23,7 @@ class TrainModule():
     def __init__(self, opt: dict, dataset: LoadDataset):
         self.dataset = dataset
         self.nodeEmbedding = opt["settings"]["vectorize"]["node_embedding_method"]
-        self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], self.nodeEmbedding)
+        self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], dataset.datasetName, self.nodeEmbedding)
         self.rawDataset = dataset.rawDataset
         self.trainDataset = dataset.trainData
         self.valDataset = dataset.valData
@@ -68,30 +68,37 @@ class TrainModule():
         self.parallel = opt["settings"]["train"]["parallel"]
         self.parallel_device = opt["settings"]["train"]["parallel_device"]
 
-    def load_GE_data(self, dataset: pd.DataFrame):
-        labels = []
-        graphList = []
-        for index, row in tqdm(dataset.iterrows(), total=dataset.shape[0]):
-            cpu = row["CPU"]
-            family = row["family"]
-            fileName = row["file_name"]
-            filePath = f"{self.embeddingFolder}/{cpu}/{family}/{fileName}.gpickle"
-            with open(filePath, "rb") as f:
-                fcg = pickle.load(f)
-            for node in fcg.nodes:
-                if not isinstance(fcg.nodes[node]["x"], torch.Tensor):
-                    fcg.nodes[node]["x"] = torch.tensor(fcg.nodes[node]["x"], dtype=torch.float)
-                if len(fcg.nodes[node]["x"]) == 0:
-                    fcg.nodes[node]["x"] = torch.zeros(self.embeddingSize)
-            torch_data = from_networkx(fcg)
-            labels.append(family)
-            graphList.append(torch_data)
-        le = labelEncoder.LabelEncoder()
-        le.fit(labels)
-        labels_ = le.transform(labels)
-        for i, data in enumerate(graphList):
-            data.y = torch.tensor(labels_[i])
-            # data.num_nodes = len(data.x)
+    def load_GE_data(self, dataset: pd.DataFrame, dataPath: str):
+        if not os.path.exists(dataPath):
+            labels = []
+            graphList = []
+            for index, row in tqdm(dataset.iterrows(), total=dataset.shape[0]):
+                cpu = row["CPU"]
+                family = row["family"]
+                fileName = row["file_name"]
+                filePath = f"{self.embeddingFolder}/{cpu}/{family}/{fileName}.gpickle"
+                with open(filePath, "rb") as f:
+                    fcg = pickle.load(f)
+                for node in fcg.nodes:
+                    if not isinstance(fcg.nodes[node]["x"], torch.Tensor):
+                        fcg.nodes[node]["x"] = torch.tensor(fcg.nodes[node]["x"], dtype=torch.float)
+                    if len(fcg.nodes[node]["x"]) == 0:
+                        fcg.nodes[node]["x"] = torch.zeros(self.embeddingSize)
+                torch_data = from_networkx(fcg)
+                labels.append(family)
+                graphList.append(torch_data)
+            le = labelEncoder.LabelEncoder()
+            le.fit(labels)
+            labels_ = le.transform(labels)
+            for i, data in enumerate(graphList):
+                data.y = torch.tensor(labels_[i])
+            print(f"Saving data to {dataPath}")
+            with open(dataPath, "wb") as f:
+                pickle.dump([graphList, labels_], f)
+        else:
+            print(f"Loading data from {dataPath}")
+            with open(dataPath, "rb") as f:
+                graphList, labels_ = pickle.load(f)
         
         return graphList, labels_
 
@@ -116,12 +123,12 @@ class TrainModule():
         print("Setting up the training module...")
         print(f"Loading data from {self.embeddingFolder}...")
         print("Loading training data...")
-        self.trainGraph, label = self.load_GE_data(self.trainDataset)
+        self.trainGraph, label = self.load_GE_data(self.trainDataset, os.path.join(self.embeddingFolder, "trainData.pkl"))
         sampler = FcgSampler(label, self.support_shots_train + self.query_shots_train, self.class_per_iter_train, self.iterations)
         self.trainLoader = DataLoader(self.trainGraph, batch_sampler=sampler, num_workers=4, collate_fn=collate_graphs)    
         if self.valDataset is not None:
             print("Loading validation data...")
-            self.valGraph, label = self.load_GE_data(self.valDataset)
+            self.valGraph, label = self.load_GE_data(self.valDataset, os.path.join(self.embeddingFolder, "valData.pkl"))
             val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
             self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4, collate_fn=collate_graphs)
         else:
@@ -143,7 +150,6 @@ class TrainModule():
         print("Finish setting up the training module")
 
     def end_of_epoch(self, avg_acc, best_acc, epoch, patience):
-
         if avg_acc >= best_acc:
             best_acc = avg_acc
             if self.save_model:
@@ -155,7 +161,7 @@ class TrainModule():
                 patience += 1
                 if patience == self.early_stopping_patience:
                     print("Early stopping")
-                    record_log(self.log_file, "Early stopping in epoch {}\n", format(epoch+1))
+                    record_log(self.log_file, "Early stopping in epoch {}\n".format(epoch+1))
                     
                     return best_acc, patience, True
         return best_acc, patience, False
@@ -197,6 +203,8 @@ class TrainModule():
                 avg_acc = np.mean(train_acc[-(self.iterations):])
                 postfix = ' (Best)' if avg_acc >= best_train_acc else ' (Best: {})'.format(best_train_acc)
                 content = 'Avg Train Loss: {}, Avg Train Acc: {}{}'.format(avg_loss, avg_acc, postfix)
+                if self.valLoader is not None and avg_acc >= best_train_acc:
+                    best_train_acc = avg_acc
                 print(content)
                 record_log(self.log_file, "Epoch {}: {}\n".format(epoch+1, content))
             if self.valLoader is not None: 
@@ -218,9 +226,9 @@ class TrainModule():
             else:
                 best_train_acc, patience, stop = self.end_of_epoch(avg_acc, best_train_acc, epoch, patience)
             
-            if self.save_model and epoch % 10 == 0:
+            if self.save_model and (epoch+1) % 10 == 0:
                 save_checkpoint(state=self.model.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder)
-            
+            print("Patience: {}/{}".format(patience, self.early_stopping_patience))
             if stop:
                 break
 

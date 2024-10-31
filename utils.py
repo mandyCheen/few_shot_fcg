@@ -14,9 +14,13 @@ def save_config(config, config_path):
 
 def save_checkpoint(state, is_best, epoch, checkpoint):
     if is_best:
+        for name in os.listdir(checkpoint):
+            if ('best' in name):
+                to_remove = os.path.join(checkpoint, name)
+                os.remove(to_remove)
         filename = os.path.join(checkpoint, 'epoch_{}__best.pth'.format(epoch))
     else:
-        filename = os.path.join(checkpoint, 'epoch_{}_.pth'.format(epoch))
+        filename = os.path.join(checkpoint, 'epoch_{}_checkpoint.pth'.format(epoch))
     
     torch.save(state, filename)
 

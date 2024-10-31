@@ -12,15 +12,18 @@ class LoadDataset:
         self.datasetSplitFolder = opt["paths"]["data"]["split_folder"]
         self.val = opt["settings"]["train"]["validation"]
         self.splitByCpu = opt["dataset"]["split_by_cpu"]
-        self.trainData, self.testData, self.valData = self.load_all_datasets()
-        self.familyCpuList = self.rawDataset.groupby("family")["CPU"].unique().to_dict()
-
-    def write_split_dataset(self, mode, familyList) -> None:
         splitByCpu = "_splitByCpu" if self.splitByCpu else ""
+        self.reverseTool = opt["dataset"]["reverse_tool"]
         val = "_withVal" if self.val else ""
+        self.familyCpuList = self.rawDataset.groupby("family")["CPU"].unique().to_dict()
+        self.datasetName = f"{self.cpuArch}{splitByCpu}{val}_{self.reverseTool}"
+
+        self.trainData, self.testData, self.valData = self.load_all_datasets()
+    
+    def write_split_dataset(self, mode, familyList) -> None:
         if not os.path.exists(self.datasetSplitFolder):
             os.makedirs(self.datasetSplitFolder)
-        filepath = f"{self.datasetSplitFolder}/{mode}_{self.cpuArch}_opcode{splitByCpu}{val}.txt"
+        filepath = f"{self.datasetSplitFolder}/{mode}_{self.datasetName}.txt"
         with open(filepath, "w") as f:
             for family in familyList:
                 f.write(f"{family}\n")
@@ -70,9 +73,7 @@ class LoadDataset:
             self.write_split_dataset("val", valFamily)
 
     def load_dataset(self, mode) -> pd.DataFrame:
-        splitByCpu = "_splitByCpu" if self.splitByCpu else ""
-        val = "_withVal" if self.val else ""
-        filepath = f"{self.datasetSplitFolder}/{mode}_{self.cpuArch}_opcode{splitByCpu}{val}.txt"
+        filepath = f"{self.datasetSplitFolder}/{mode}_{self.datasetName}.txt"
         if self.splitByCpu:
             if not os.path.exists(filepath):
                 print(f"Split dataset for {mode} does not exist, creating split dataset...")
