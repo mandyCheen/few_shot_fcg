@@ -34,23 +34,23 @@ class ProtoLoss:
     def cosine(self, input, target):
         pass
 
-    def euclidean(self, input, target, n_support=5):
+    def euclidean(self, input, target):
 
         target_cpu = target.cpu()
         input_cpu = input.cpu()
 
 
         def supp_idxs(c):
-            return target_cpu.eq(c).nonzero()[:n_support].squeeze(1)
+            return target_cpu.eq(c).nonzero()[:self.n_support].squeeze(1)
 
         classes = torch.unique(target_cpu)
         n_classes = len(classes)
-        n_query = target_cpu.eq(classes[0].item()).sum().item() - n_support
+        n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
 
         support_idxs = list(map(supp_idxs, classes))
         prototypes = torch.stack([input_cpu[idx_list].mean(0) for idx_list in support_idxs])
 
-        query_idxs = torch.stack(list(map(lambda c: target_cpu.eq(c).nonzero()[n_support:], classes))).view(-1)
+        query_idxs = torch.stack(list(map(lambda c: target_cpu.eq(c).nonzero()[self.n_support:], classes))).view(-1)
 
         query_samples = input.to('cpu')[query_idxs]
         dists = euclidean_dist(query_samples, prototypes)

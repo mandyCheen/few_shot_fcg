@@ -2,31 +2,35 @@
     "dataset": {
         "pack_filter": "diec",
         "cpu_arch": "x86_64",
-        "reverse_tool": "r2",
-        "raw": "malware_diec_r2_x86_64_fcg_dataset.csv",
-        "split_by_cpu": false
+        "reverse_tool": "ghidra",
+        "raw": "malware_diec_ghidra_x86_64_fcg_dataset.csv",
+        "split_by_cpu": false,
+        "pretrain_family": ["gafgyt", "ngioweb", "mirai", "tsunami"]
     },
-    "settings":{
+    "pretrain": {
+        "name": "x86_pretrained",
+        "use": true,
+        "raw_dataset": "malware_diec_ghidra_x86_64_fcg_pretrain_dataset.csv",
+        "batch_size": 128
+    },
+    "settings": {
         "name": "x86_proto",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
             "hidden_size": 128,
-            "output_size": 128
-        },
-        "pretrian": {
-            "use": true,
-            "model_name": "GraphSAGE"
+            "output_size": 128,
+            "num_layers": 2
         },
         "train": {
             "training": true,
             "validation": true,
-            "num_epochs": 500,
-            "device": "cuda:0", 
+            "num_epochs": 5000,
+            "device": "cuda:1",
             "parallel": false,
-            "parallel_device": [0, 1, 2, 3],
+            "parallel_device": [],
             "iterations": 100,
-            "lr": 0.001,
+            "lr": 0.01,
             "lr_scheduler": {
                 "use": true,
                 "method": "StepLR",
@@ -37,18 +41,19 @@
                 "use": true,
                 "patience": 50
             },
-            "loss": "euclidean",
+            "loss": "CrossEntropy",
             "optimizer": "Adam",
-            "save_model": true
+            "save_model": true,
+            "load_weights": "/home/manying/Projects/fcgFewShot/pretrained/x86_pretrained_20241116_1536/epoch_2002_best_backbone.pth"
         },
         "few_shot": {
             "method": "ProtoNet",
-            "train":{
+            "train": {
                 "support_shots": 5,
                 "query_shots": 5,
                 "class_per_iter": 20
             },
-            "test":{
+            "test": {
                 "support_shots": 5,
                 "query_shots": 15,
                 "class_per_iter": 5
@@ -63,13 +68,15 @@
     },
     "paths": {
         "data": {
-            "fcg_dataset": "./data_5_9_4_fcg",
+            "fcg_dataset": "./data_r2_5_9_4_fcg",
             "csv_folder": "./dataset/raw_csv",
             "split_folder": "./dataset/split",
-            "model_folder": "./models",
             "embedding_folder": "./embeddings",
+            "pretrain_dataset": "./dataset/data_ghidra_fcg_pretrain"
+        },
+        "model": {
+            "model_folder": "./models",
             "pretrained_folder": "./pretrained"
         }
     }
-
 }

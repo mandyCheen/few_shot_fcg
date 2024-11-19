@@ -2,23 +2,34 @@
 import pandas as pd
 import numpy as np
 import os
+from sklearn.model_selection import train_test_split
 
 class LoadDataset:
-    def __init__(self, opt: dict):
-        rawDatasetPath = os.path.join(opt["paths"]["data"]["csv_folder"], opt["dataset"]["raw"])
-        self.rawDataset = pd.read_csv(rawDatasetPath)
-        self.seed = opt["settings"]["seed"]
-        self.cpuArch = opt["dataset"]["cpu_arch"]
-        self.datasetSplitFolder = opt["paths"]["data"]["split_folder"]
-        self.val = opt["settings"]["train"]["validation"]
-        self.splitByCpu = opt["dataset"]["split_by_cpu"]
-        splitByCpu = "_splitByCpu" if self.splitByCpu else ""
-        self.reverseTool = opt["dataset"]["reverse_tool"]
-        val = "_withVal" if self.val else ""
-        self.familyCpuList = self.rawDataset.groupby("family")["CPU"].unique().to_dict()
-        self.datasetName = f"{self.cpuArch}{splitByCpu}{val}_{self.reverseTool}"
-
-        self.trainData, self.testData, self.valData = self.load_all_datasets()
+    def __init__(self, opt: dict, pretrain: bool = False):
+        if pretrain:
+            rawDatasetPath = os.path.join(opt["paths"]["data"]["csv_folder"], opt["pretrain"]["raw_dataset"])
+            self.rawDataset = pd.read_csv(rawDatasetPath)
+            self.seed = opt["settings"]["seed"]
+            self.cpuArch = opt["dataset"]["cpu_arch"]
+            self.reverseTool = opt["dataset"]["reverse_tool"]
+            self.datasetName = f"{self.cpuArch}_pretrain_{self.reverseTool}"
+            self.trainData, self.testData, self.valData = self.load_pretrain_dataset()    
+        else:
+            rawDatasetPath = os.path.join(opt["paths"]["data"]["csv_folder"], opt["dataset"]["raw"])
+            self.rawDataset = pd.read_csv(rawDatasetPath)
+            self.seed = opt["settings"]["seed"]
+            self.cpuArch = opt["dataset"]["cpu_arch"]
+            self.datasetSplitFolder = opt["paths"]["data"]["split_folder"]
+            self.val = opt["settings"]["train"]["validation"]
+            self.splitByCpu = opt["dataset"]["split_by_cpu"]
+            self.reverseTool = opt["dataset"]["reverse_tool"]
+            self.familyInTrain = opt["dataset"]["pretrain_family"]
+            splitByCpu = "_splitByCpu" if self.splitByCpu else ""
+            val = "_withVal" if self.val else ""
+            pretrain = "_withPretrain" if opt["dataset"]["pretrain"]["use"] else ""
+            self.familyCpuList = self.rawDataset.groupby("family")["CPU"].unique().to_dict()
+            self.datasetName = f"{self.cpuArch}{splitByCpu}{val}{pretrain}_{self.reverseTool}"
+            self.trainData, self.testData, self.valData = self.load_all_datasets()
     
     def write_split_dataset(self, mode, familyList) -> None:
         if not os.path.exists(self.datasetSplitFolder):
@@ -33,13 +44,23 @@ class LoadDataset:
             testNum, valNum = 10, 10
         else:
             testNum, valNum = 10, 0
-        familyList = self.rawDataset["family"].unique()
+        allFamilies = set(self.rawDataset["family"].unique())
+        requiredTrainFamilies = set(self.familyInTrain)
+
+        missing_families = requiredTrainFamilies - allFamilies
+        if missing_families:
+            raise ValueError(f"Required families not found in dataset: {missing_families}")
+
+        remainingFamilies = list(allFamilies - requiredTrainFamilies)
+
         np.random.seed(self.seed)
-        np.random.shuffle(familyList)
+        np.random.shuffle(remainingFamilies)
         
-        trainFamily = familyList[:int(len(familyList) - testNum - valNum)]
-        testFamily = familyList[int(len(familyList) - testNum - valNum):int(len(familyList) - valNum)]
-        valFamily = familyList[int(len(familyList) - valNum):]
+        additionalTrainNum = len(allFamilies) - testNum - valNum - len(requiredTrainFamilies)
+
+        trainFamily = list(requiredTrainFamilies) + remainingFamilies[:additionalTrainNum]
+        testFamily = remainingFamilies[additionalTrainNum:additionalTrainNum + testNum]
+        valFamily = remainingFamilies[additionalTrainNum + testNum:]
         
         self.write_split_dataset("train", trainFamily)
         self.write_split_dataset("test", testFamily)
@@ -97,4 +118,10 @@ class LoadDataset:
         trainData = self.load_dataset("train")
         testData = self.load_dataset("test")
         valData = self.load_dataset("val") if self.val else None
+        return trainData, testData, valData
+    
+    def load_pretrain_dataset(self, splitRate: tuple = (0.6, 0.2, 0.2)) -> pd.DataFrame:
+        print("Loading pretrain dataset...")
+        trainData, testData = train_test_split(self.rawDataset, test_size=splitRate[1], random_state=self.seed)
+        trainData, valData = train_test_split(trainData, test_size=splitRate[2], random_state=self.seed)
         return trainData, testData, valData

@@ -12,17 +12,28 @@ def save_config(config, config_path):
     with open(config_path, 'w') as f:
         json.dump(config, f, indent=4)
 
-def save_checkpoint(state, is_best, epoch, checkpoint):
+def save_checkpoint(model_state, optim_state, sche_state, is_best, epoch, checkpoint, backbone=False):
+    """
+    Save model checkpoint
+    """
+    if backbone:
+        back = '_backbone'
+    else:
+        back = ''
     if is_best:
         for name in os.listdir(checkpoint):
-            if ('best' in name):
+            if ('best{}'.format(back) in name):
                 to_remove = os.path.join(checkpoint, name)
                 os.remove(to_remove)
-        filename = os.path.join(checkpoint, 'epoch_{}__best.pth'.format(epoch))
+        filename = os.path.join(checkpoint, 'epoch_{}_best{}.pth'.format(epoch, back))
     else:
-        filename = os.path.join(checkpoint, 'epoch_{}_checkpoint.pth'.format(epoch))
+        filename = os.path.join(checkpoint, 'epoch_{}_checkpoint{}.pth'.format(epoch, back))
     
-    torch.save(state, filename)
+    torch.save({    'epoch': epoch,
+                    'model_state_dict': model_state,
+                    'optimizer_state_dict': optim_state,
+                    'scheduler_state_dict': sche_state,
+                    }, filename)
 
 def save_model_architecture(model, model_path):
     with open(model_path, 'w') as f:

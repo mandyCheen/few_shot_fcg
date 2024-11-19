@@ -8,14 +8,16 @@ import sklearn.preprocessing as labelEncoder
 import torch
 
 class FCGVectorize():
-    def __init__(self, opt: dict, dataset: LoadDataset):
+    def __init__(self, opt: dict, dataset: LoadDataset, pretrain: bool = False):
         self.nodeEmbedding = opt["settings"]["vectorize"]["node_embedding_method"]
-        self.data_root = opt["paths"]["data"]["fcg_dataset"]
+        if pretrain:
+            self.data_root = opt["paths"]["data"]["pretrain_dataset"]
+        else:
+            self.data_root = opt["paths"]["data"]["fcg_dataset"]
         self.rawDataset = dataset.rawDataset
         self.trainDataset = dataset.trainData
         self.testDataset = dataset.testData 
         self.valDataset = dataset.valData
-        self.datasetName = opt
         self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], dataset.datasetName, self.nodeEmbedding)
         self.embeddingSize = opt["settings"]["vectorize"]["node_embedding_size"]
         self.numWorkers = opt["settings"]["vectorize"]["num_workers"]
