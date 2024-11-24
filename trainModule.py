@@ -145,6 +145,9 @@ class TrainModule(Training):
         model = model.to(self.device)
         
         print(f"Model: {model}")
-        print("Start evaluation...")
+        print("Start evaluation... (testing dataset)")
         self.testing(model, testLoader)
+
+        print("Start evaluation... (validation dataset)")
+        self.testing(model, self.valLoader)
         print("Finish evaluation")

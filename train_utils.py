@@ -181,9 +181,9 @@ class Training:
         return True
     
     def testing(self, testModel, testLoader):
-        testModel.eval()
         avg_acc = list()
         for data in tqdm(testLoader, desc="Testing"):
+            testModel.eval()
             data = data.to(self.device)
             with torch.no_grad():
                 model_output = testModel(data)
