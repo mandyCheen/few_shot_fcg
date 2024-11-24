@@ -11,9 +11,8 @@ from train_utils import Training, load_GE_data
 from loadDataset import LoadDataset
 from graphSAGE import GraphClassifier
 
-class PretrainModule():
+class PretrainModule(Training):
     def __init__(self, opt: dict, dataset: LoadDataset):
-        super(PretrainModule, self).__init__()
         self.opt = opt
         self.device = opt["settings"]["train"]["device"]
         self.device = torch.device(self.device)
@@ -23,6 +22,9 @@ class PretrainModule():
         self.parallel_device = opt["settings"]["train"]["parallel_device"]
 
         self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], dataset.datasetName, opt["settings"]["vectorize"]["node_embedding_method"])
+        now = datetime.now()
+        self.model_folder = opt["paths"]["model"]["pretrained_folder"] + "/" + opt["pretrain"]["name"] + "_" + now.strftime("%Y%m%d_%H%M")
+        
         self.rawDataset = dataset.rawDataset
         self.trainDataset = dataset.trainData
         self.valDataset = dataset.valData
@@ -35,9 +37,22 @@ class PretrainModule():
         self.get_lr_scheduler(opt)
         self.get_pretrain_loader(opt)
 
-        self.load_weights = opt["settings"]["train"]["load_weights"]
+        self.load_weights = opt["settings"]["model"]["load_weights"]
         if self.load_weights:
             self.resume_training()
+
+        super().__init__(
+            opt=self.opt,
+            trainLoader=self.train_loader,
+            valLoader=self.val_loader,
+            model=self.model,
+            loss_fn=self.criterion,
+            optim=self.optimizer,
+            scheduler=self.scheduler if self.lr_scheduler else None,
+            device=self.device,
+            model_path=self.model_folder
+        )
+
 
     def resume_training(self):
         checkpoint = torch.load(self.load_weights)
@@ -55,14 +70,17 @@ class PretrainModule():
         else:
             raise ValueError("Optimizer not supported")
     def get_loss_fn(self, opt: dict):
-        if opt["settings"]["train"]["loss"] == "CrossEntropy":
+        if opt["settings"]["train"]["loss"] == "CrossEntropyLoss":
             self.criterion = nn.CrossEntropyLoss().to(self.device)
         elif opt["settings"]["train"]["loss"] == "MSELoss":
             self.criterion = nn.MSELoss().to(self.device)
+        elif opt["settings"]["train"]["loss"] == "NLLLoss":
+            self.criterion = nn.NLLLoss().to(self.device)
         else:
             raise ValueError("Loss function not supported")
     def get_lr_scheduler(self, opt: dict):
         if opt["settings"]["train"]["lr_scheduler"]["use"]:
+            self.lr_scheduler = True
             if opt["settings"]["train"]["lr_scheduler"]["method"] == "StepLR":
                 scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=opt["settings"]["train"]["lr_scheduler"]["step_size"], gamma=opt["settings"]["train"]["lr_scheduler"]["gamma"])
             self.scheduler = scheduler
@@ -97,7 +115,7 @@ class PretrainModule():
         self.model = model
 
     def train(self):
-        training = Training(self.opt, self.train_loader, self.val_loader, self.model, self.criterion, self.optimizer, self.scheduler, self.device)
+        training = Training(self.opt, self.train_loader, self.val_loader, self.model, self.criterion, self.optimizer, self.scheduler, self.device, self.model_folder)
         print("Start training...")
-        training.run(backbone=True, mode="pretrain")
+        self.run(backbone=True, mode="classification")
         print("Finish training")

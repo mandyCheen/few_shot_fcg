@@ -80,10 +80,9 @@ class GraphClassifier(torch.nn.Module):
         )
 
     def forward(self, data):
-        
         h = self.backbone(data)
         out = self.classifier(h)
-        return F.log_softmax(out, dim=-1)
+        return out
     
     def get_embeddings(self, data):
        
