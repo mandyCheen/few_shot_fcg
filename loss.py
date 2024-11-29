@@ -70,22 +70,20 @@ DISTANCE_METRICS = {
     'cosine': CosineDistance,
     'manhattan': ManhattanDistance
 }
-class ProtoLoss:
-    """Prototypical Networks Loss with multiple distance metrics"""
-    
-    def __init__(self, opt: dict):
-        self.metric_name = opt["settings"]["train"]["distance"]
-        self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
-        
-        if self.metric_name not in DISTANCE_METRICS:
-            raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
-                           f"Supported metrics are: {list(DISTANCE_METRICS.keys())}")
-        
-        self.distance_metric = DISTANCE_METRICS[self.metric_name]
+
+class Loss:
+    def __init__(self, metric_name, n_support, distance_metric):
+        self.metric_name = metric_name
+        self.n_support = n_support
+        self.distance_metric = distance_metric
         
     def compute_prototypes(self, input, support_idxs):
         """Compute prototype vectors"""
         return torch.stack([input[idx_list].mean(0) for idx_list in support_idxs])
+    
+    def get_nn_points(self, input, support_idxs):
+        """Get nearest neighbor points"""
+        return torch.cat([input[idx_list] for idx_list in support_idxs])
     
     def get_support_query_idxs(self, target):
         """Split data into support and query sets"""
@@ -138,6 +136,21 @@ class ProtoLoss:
         
         return loss_val, acc_val
 
+class ProtoLoss(Loss):
+    """Prototypical Networks Loss with multiple distance metrics"""
+    
+    def __init__(self, opt: dict):
+        self.metric_name = opt["settings"]["train"]["distance"]
+        self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+        
+        if self.metric_name not in DISTANCE_METRICS:
+            raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
+                           f"Supported metrics are: {list(DISTANCE_METRICS.keys())}")
+        
+        self.distance_metric = DISTANCE_METRICS[self.metric_name]
+        
+        super().__init__(self.metric_name, self.n_support, self.distance_metric)
+
     def __call__(self, input, target):
         """
         計算Prototypical Networks的損失值和準確率
@@ -173,6 +186,39 @@ class ProtoLoss:
         """返回當前使用的距離度量方法名稱"""
         return self.metric_name
 
+class NNLoss(Loss):
+    def __init__(self, opt: dict):
+        self.metric_name = opt["settings"]["train"]["distance"]
+        self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+            
+        if self.metric_name not in DISTANCE_METRICS:
+            raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
+                        f"Supported metrics are: {list(DISTANCE_METRICS.keys())}")
+        
+        self.distance_metric = DISTANCE_METRICS[self.metric_name]
+        
+        super().__init__(self.metric_name, self.n_support, self.distance_metric)
+    
+    def __call__(self, input, target):
+        target_cpu = target.cpu()
+        input_cpu = input.cpu()
+        
+        classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
+        n_classes = len(classes)
+        n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        
+        nn_points = self.get_nn_points(input_cpu, support_idxs)
+        
+        query_samples = input_cpu[query_idxs]
+        
+        dists = self.distance_metric.compute(query_samples, nn_points)
+        
+        # find the nearest neighbor for each query point
+        dists_by_class = dists.view(n_classes*n_query, n_classes, self.n_support)
+        min_dists, _ = dists_by_class.min(dim=2)
+        
+        return self.compute_loss_and_acc(min_dists, n_classes, n_query)
+        
 
 class DCELoss:
     

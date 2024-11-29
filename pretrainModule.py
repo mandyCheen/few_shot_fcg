@@ -55,7 +55,7 @@ class PretrainModule(Training):
 
 
     def resume_training(self):
-        checkpoint = torch.load(self.load_weights)
+        checkpoint = torch.load(self.load_weights, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])

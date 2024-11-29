@@ -40,10 +40,12 @@ class FCGVectorize():
                 with open(filePath, "rb") as f:
                     fcg = pickle.load(f)
                     for node in fcg.nodes():
+                        avgOpcodeEmbedding = []
                         opcode = fcg.nodes[node]["x"]
                         opcode = [op for op in opcode if op in model.wv]
                         if opcode == []:
                             avgOpcodeEmbedding = [0] * self.embeddingSize
+                            fcg.nodes[node]["x"] = avgOpcodeEmbedding
                             continue
                         opcodeEmbedding = model.wv[opcode]
                         opcodeEmbedding = torch.tensor(opcodeEmbedding)
