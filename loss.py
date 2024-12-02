@@ -175,10 +175,8 @@ class ProtoLoss(Loss):
         
         # 獲取query樣本
         query_samples = input_cpu[query_idxs]
-        
         # 計算距離
         dists = self.distance_metric.compute(query_samples, prototypes)
-        
         # 計算損失和準確率
         return self.compute_loss_and_acc(dists, n_classes, n_query)
 

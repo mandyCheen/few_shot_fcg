@@ -5,7 +5,7 @@ import torch
 from torch_geometric.data import Data, Batch
 from loadDataset import LoadDataset
 from dataset import FcgSampler
-from graphSAGE import GraphSAGE, GraphClassifier
+from models import GraphSAGE, GCN
 from torch_geometric.loader import DataLoader # !
 from loss import *
 from datetime import datetime
@@ -65,6 +65,8 @@ class TrainModule(Training):
         info = self.opt["settings"]["model"]
         if info["model_name"] == "GraphSAGE":
             self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+        elif info["model_name"] == "GCN":
+            self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
         else:
             raise ValueError("Model not supported")
         
@@ -90,6 +92,8 @@ class TrainModule(Training):
             loss_fn = ProtoLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "NNNet":
             loss_fn = NNLoss(self.opt)
+        else:
+            raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
     def get_optimizer(self):
         if self.opt["settings"]["train"]["optimizer"] == "Adam":
@@ -107,6 +111,21 @@ class TrainModule(Training):
                 ])
             else:
                 optimizer = torch.optim.Adam(self.model.parameters(), lr=self.opt["settings"]["train"]["lr"])
+        elif self.opt["settings"]["train"]["optimizer"] == "AdamW":
+            if self.opt["settings"]["model"]["projection"]:
+                optimizer = torch.optim.AdamW([
+                    {
+                        "params": self.model.output_proj.parameters(),
+                        "lr": self.opt["settings"]["train"]["projection_lr"]
+                    },
+                    {
+                        "params": (p for n, p in self.model.named_parameters()
+                                   if not n.startswith("output_proj")),
+                        "lr": self.opt["settings"]["train"]["lr"]
+                    }
+                ])
+            else:
+                optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.opt["settings"]["train"]["lr"])
         elif self.opt["settings"]["train"]["optimizer"] == "SGD":
             if self.opt["settings"]["model"]["projection"]:
                 optimizer = torch.optim.SGD([
@@ -122,11 +141,17 @@ class TrainModule(Training):
                 ])
             else:
                 optimizer = torch.optim.SGD(self.model.parameters(), lr=self.opt["settings"]["train"]["lr"])
+        else:
+            raise ValueError("Optimizer not supported")
         self.optim = optimizer
         
     def get_lr_scheduler(self):
         if self.opt["settings"]["train"]["lr_scheduler"]["method"] == "StepLR":
             scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=self.opt["settings"]["train"]["lr_scheduler"]["step_size"], gamma=self.opt["settings"]["train"]["lr_scheduler"]["gamma"])
+        elif self.opt["settings"]["train"]["lr_scheduler"]["method"] == "ReduceLROnPlateau":
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=self.opt["settings"]["train"]["lr_scheduler"]["factor"], patience=self.opt["settings"]["train"]["lr_scheduler"]["patience"])
+        else:
+            raise ValueError("LR scheduler not supported")
         self.scheduler = scheduler
 
     def setting(self):
@@ -195,6 +220,8 @@ class TestModule(Testing):
             loss_fn = ProtoLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "NNNet":
             loss_fn = NNLoss(self.opt)
+        else:
+            raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
     
     def setting(self):
@@ -258,7 +285,8 @@ class TestModule(Testing):
         valAcc = self.testing(self.model, self.valLoader)
 
         pretrainModelPath = self.opt["settings"]["model"]["load_weights"]
-        self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
+        if pretrainModelPath != "":
+            self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
         print(f"Ablation evaluation... (testing dataset)")
         self.pretrainModel = self.pretrainModel.to(self.device)
         

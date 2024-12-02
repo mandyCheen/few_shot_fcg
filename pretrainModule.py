@@ -9,7 +9,7 @@ import os
 from tqdm import tqdm
 from train_utils import Training, load_GE_data
 from loadDataset import LoadDataset
-from graphSAGE import GraphClassifier
+from models import GraphClassifier
 
 class PretrainModule(Training):
     def __init__(self, opt: dict, dataset: LoadDataset):
@@ -53,7 +53,6 @@ class PretrainModule(Training):
             model_path=self.model_folder
         )
 
-
     def resume_training(self):
         checkpoint = torch.load(self.load_weights, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
@@ -83,6 +82,10 @@ class PretrainModule(Training):
             self.lr_scheduler = True
             if opt["settings"]["train"]["lr_scheduler"]["method"] == "StepLR":
                 scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=opt["settings"]["train"]["lr_scheduler"]["step_size"], gamma=opt["settings"]["train"]["lr_scheduler"]["gamma"])
+            elif opt["settings"]["train"]["lr_scheduler"]["method"] == "ReduceLROnPlateau":
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=opt["settings"]["train"]["lr_scheduler"]["factor"], patience=opt["settings"]["train"]["lr_scheduler"]["patience"])
+            else:
+                raise ValueError("Scheduler not supported")
             self.scheduler = scheduler
 
     def get_pretrain_loader(self, opt: dict):
@@ -96,7 +99,9 @@ class PretrainModule(Training):
     def get_model(self, opt: dict):
         info = self.opt["settings"]["model"]
         if info["model_name"] == "GraphSAGE":
-            model = GraphClassifier(backbone_dim_in=info["input_size"], backbone_dim_h=info["hidden_size"], backbone_dim_out=info["output_size"], backbone_num_layers=info["num_layers"], num_classes=len(opt["dataset"]["pretrain_family"]))
+            model = GraphClassifier(backbone_dim_in=info["input_size"], backbone_dim_h=info["hidden_size"], backbone_dim_out=info["output_size"], backbone_num_layers=info["num_layers"], num_classes=len(opt["dataset"]["pretrain_family"]), backbone_type="sage")
+        elif info["model_name"] == "GCN":
+            model = GraphClassifier(backbone_dim_in=info["input_size"], backbone_dim_h=info["hidden_size"], backbone_dim_out=info["output_size"], backbone_num_layers=info["num_layers"], num_classes=len(opt["dataset"]["pretrain_family"]), backbone_type="gcn")
         else:
             raise ValueError("Model not supported")
         if torch.cuda.is_available() and self.device == "cpu":

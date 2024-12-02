@@ -8,7 +8,7 @@ import os
 
 if __name__ == '__main__':
 
-    options = load_config("./config.json")
+    options = load_config("./config_pretrain.json")
     dataset = LoadDataset(options, pretrain=True)
 
     vectorize = FCGVectorize(options, dataset, pretrain=True)
