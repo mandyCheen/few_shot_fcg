@@ -19,7 +19,7 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "x86_few_shot_5way_5shot_cosine",
+        "name": "x86_10way_5shot",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
@@ -38,7 +38,7 @@
             "parallel_device": [],
             "iterations": 100,
             "lr": 0.001,
-            "projection_lr": 0.008,
+            "projection_lr": 0.01,
             "lr_scheduler": {
                 "use": true,
                 "method": "ReduceLROnPlateau",
@@ -49,10 +49,10 @@
             },
             "early_stopping": {
                 "use": true,
-                "patience": 20
+                "patience": 40
             },
             "loss": "CrossEntropyLoss",
-            "distance": "cosine",
+            "distance": "euclidean",
             "optimizer": "AdamW",
             "save_model": true
         },
@@ -61,12 +61,12 @@
             "train": {
                 "support_shots": 5,
                 "query_shots": 15,
-                "class_per_iter": 5
+                "class_per_iter": 10
             },
             "test": {
                 "support_shots": 5,
                 "query_shots": 15,
-                "class_per_iter": 5
+                "class_per_iter": 10
             }
         },
         "vectorize": {
@@ -85,7 +85,7 @@
             "pretrain_dataset": "./dataset/data_ghidra_fcg_pretrain"
         },
         "model": {
-            "model_folder": "./models",
+            "model_folder": "./models_1202_euclidean",
             "pretrained_folder": "./pretrained"
         }
     }

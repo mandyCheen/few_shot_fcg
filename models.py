@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import torch_geometric
-from torch_geometric.nn import SAGEConv, GCNConv
+from torch_geometric.nn import SAGEConv, GCNConv, GINConv
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout
 from torch_geometric.nn import global_mean_pool, global_add_pool
 import os
@@ -93,6 +93,53 @@ class GraphSAGE(torch.nn.Module):
         h = x
         for i in range(self.num_layers):
             h = self.sage_convs[i](h, edge_index)
+            h = self.norms[i](h)
+            h = F.relu(h)
+            
+        h = global_add_pool(h, batch)
+
+        if self.output_proj is not None:
+            h = self.output_proj(h)
+
+        return h
+    
+class GIN(torch.nn.Module):
+    def __init__(self, dim_in: int, dim_h: int, dim_out: int, num_layers: int, projection: bool = False):
+        super().__init__()
+        self.num_layers = num_layers
+        
+        # GNN layers
+        self.gin_convs = torch.nn.ModuleList()
+        self.norms = torch.nn.ModuleList()
+        
+        # First layer
+        self.gin_convs.append(GINConv(Sequential(Linear(dim_in, dim_h), ReLU(), Linear(dim_h, dim_h))))
+        self.norms.append(BatchNorm1d(dim_h))
+        
+        # Additional layers
+        for _ in range(num_layers - 1):
+            self.gin_convs.append(GINConv(Sequential(Linear(dim_h, dim_h), ReLU(), Linear(dim_h, dim_h))))
+            self.norms.append(BatchNorm1d(dim_h))
+
+        if projection:
+            self.output_proj = nn.Sequential(
+                Linear(dim_h, dim_out),
+                BatchNorm1d(dim_out),
+                nn.ReLU()
+            )
+        else:
+            self.output_proj = None
+
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        device = x.device
+        edge_index = edge_index.to(device)
+        batch = batch.to(device)
+        
+        h = x
+        for i in range(self.num_layers):
+            h = self.gin_convs[i](h, edge_index)
             h = self.norms[i](h)
             h = F.relu(h)
             

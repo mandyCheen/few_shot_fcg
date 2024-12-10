@@ -19,7 +19,7 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "x86_few_shot_10way_10shot_euclidean",
+        "name": "x86_5way_5shot",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
@@ -27,7 +27,7 @@
             "output_size": 128,
             "num_layers": 2,
             "projection": true,
-            "load_weights": "pretrained/x86_pretrained_20241121_1653/epoch_2060_best_backbone.pth"
+            "load_weights": ""
         },
         "train": {
             "training": true,
@@ -38,18 +38,18 @@
             "parallel_device": [],
             "iterations": 100,
             "lr": 0.001,
-            "projection_lr": 0.008,
+            "projection_lr": 0.01,
             "lr_scheduler": {
                 "use": true,
-                "method": "ReduceLROnPlateau", 
+                "method": "ReduceLROnPlateau",
                 "step_size": 20,
                 "gamma": 0.5,
-                "patience": 5,
+                "patience": 10,
                 "factor": 0.5
             },
             "early_stopping": {
                 "use": true,
-                "patience": 20
+                "patience":  40
             },
             "loss": "CrossEntropyLoss",
             "distance": "euclidean",
@@ -59,14 +59,14 @@
         "few_shot": {
             "method": "ProtoNet",
             "train": {
-                "support_shots": 10,
-                "query_shots": 10,
-                "class_per_iter": 10
+                "support_shots": 5,
+                "query_shots": 15,
+                "class_per_iter": 5
             },
             "test": {
-                "support_shots": 10,
-                "query_shots": 10,
-                "class_per_iter": 10
+                "support_shots": 5,
+                "query_shots": 15,
+                "class_per_iter": 5
             }
         },
         "vectorize": {
@@ -85,7 +85,7 @@
             "pretrain_dataset": "./dataset/data_ghidra_fcg_pretrain"
         },
         "model": {
-            "model_folder": "./models",
+            "model_folder": "./models_1210_without_pretrain_proto",
             "pretrained_folder": "./pretrained"
         }
     }

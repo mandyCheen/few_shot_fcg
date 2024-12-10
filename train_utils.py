@@ -59,12 +59,36 @@ class Training:
         self.device = device
 
         self.epochs = opt["settings"]["train"]["num_epochs"]
+        # iterations for plotting = number of epochs * iterations
+        self.iterations = list(range(self.epochs * opt["settings"]["train"]["iterations"]))
         self.save_model = opt["settings"]["train"]["save_model"]
         self.early_stopping = opt["settings"]["train"]["early_stopping"]["use"]
         self.early_stopping_patience = opt["settings"]["train"]["early_stopping"]["patience"]
 
         self.model_folder = model_path        
         self.log_file = self.model_folder + "/log.txt"
+
+        self.train_acc_history = []
+        self.val_acc_history = []
+
+    def plot_accuracy(self):
+        import matplotlib.pyplot as plt
+        
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.iterations, self.train_acc_history, 'b-', label='Training Accuracy')
+        if self.valLoader is not None:
+            plt.plot(self.iterations, self.val_acc_history, 'r-', label='Validation Accuracy')
+        
+        
+        plt.xlabel('Iteration')
+        plt.ylabel('Accuracy')
+        plt.title('Training and Validation Accuracy over Iterations')
+        plt.legend()
+        plt.grid(True)
+        
+        # 保存圖片
+        plt.savefig(f'{self.model_folder}/accuracy_plot.png')
+        plt.close()
 
     def end_of_epoch(self, avg_acc, best_acc, epoch, patience, save_backbone, avg_loss):
         if self.scheduler:
@@ -166,6 +190,7 @@ class Training:
                     loss.backward()
                     self.optim.step()   
                     
+                    self.train_acc_history.append(acc.item())
                     # Update progress bar with current batch metrics
                     pbar.set_postfix({
                         'loss': f'{loss.item():.4f}',
@@ -202,6 +227,7 @@ class Training:
                                 acc = torch.sum(torch.argmax(model_output, dim=1) == data.y) / len(data.y)
                         val_loss.append(loss.item())
                         val_acc.append(acc.item())
+                        self.val_acc_history.append(acc.item())
                         # Update progress bar with current batch metrics
                         pbar.set_postfix({
                             'loss': f'{loss.item():.4f}',
@@ -222,6 +248,7 @@ class Training:
                 # lowest_train_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_train_loss, epoch, patience, backbone)
             if stop:
                 break
+        self.plot_accuracy()
         return True
 
 class Testing:

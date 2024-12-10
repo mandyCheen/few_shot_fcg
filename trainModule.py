@@ -218,8 +218,8 @@ class TestModule(Testing):
     def get_loss_fn(self):
         if self.opt["settings"]["few_shot"]["method"] == "ProtoNet":
             loss_fn = ProtoLoss(self.opt)
-        elif self.opt["settings"]["few_shot"]["method"] == "NNNet":
-            loss_fn = NNLoss(self.opt)
+        elif self.opt["settings"]["few_shot"]["method"] == "NnNet":
+            loss_fn = NnLoss(self.opt)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -256,7 +256,8 @@ class TestModule(Testing):
             model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
             
         evalFolder = os.path.dirname(model_path)
-        
+        logFolder = self.opt["paths"]["model"]["model_folder"]
+
         print("Copying split files...")
         splitFolder = self.opt["paths"]["data"]["split_folder"]
         splitFiles = [f for f in os.listdir(splitFolder) if f.endswith(f"{self.datasetName}.txt")]
@@ -266,10 +267,10 @@ class TestModule(Testing):
             os.system(f"cp {src} {dst}")
         
         print("Record evaluation log...")
-        evalLogPath = os.path.join(evalFolder, "evalLog.csv")
+        evalLogPath = os.path.join(logFolder, "evalLog.csv")
         if not os.path.exists(evalLogPath):
             with open(evalLogPath, "w") as f:
-                f.write("timestamp, model, test_acc, val_acc\n")
+                f.write("timestamp, folderName, model, test_acc, val_acc\n")
     
         print(f"Loading model from {model_path}")
 
@@ -284,6 +285,9 @@ class TestModule(Testing):
         print("Start evaluation... (validation dataset)")
         valAcc = self.testing(self.model, self.valLoader)
 
+        with open(evalLogPath, "a") as f:
+            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {valAcc}\n")
+
         pretrainModelPath = self.opt["settings"]["model"]["load_weights"]
         if pretrainModelPath != "":
             self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
@@ -297,6 +301,5 @@ class TestModule(Testing):
         print("Finish evaluation")
         
         with open(evalLogPath, "a") as f:
-            f.write(f"{datetime.now()}, {os.path.basename(model_path)}, {testAcc}, {valAcc}\n")
-            f.write(f"{datetime.now()}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}, {valAccPretrain}\n")
+            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}, {valAccPretrain}\n")
             

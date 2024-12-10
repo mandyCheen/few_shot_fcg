@@ -9,6 +9,14 @@ class DistanceMetric:
     def compute(x, y):
         raise NotImplementedError
 
+
+class LossFunction:
+    """Base class for loss functions"""
+    @staticmethod
+    def compute(dists, n_classes, n_query):
+        raise NotImplementedError
+
+
 class EuclideanDistance(DistanceMetric):
     @staticmethod
     def compute(x, y):
@@ -64,40 +72,27 @@ class ManhattanDistance(DistanceMetric):
         y = y.unsqueeze(0).expand(n, m, d)
 
         return torch.abs(x - y).sum(2)
-    
-DISTANCE_METRICS = {
-    'euclidean': EuclideanDistance,
-    'cosine': CosineDistance,
-    'manhattan': ManhattanDistance
-}
 
-class Loss:
-    def __init__(self, metric_name, n_support, distance_metric):
-        self.metric_name = metric_name
-        self.n_support = n_support
-        self.distance_metric = distance_metric
+class CosineSimilarity(DistanceMetric):
+    @staticmethod
+    def compute(x, y):
+        '''
+        Compute cosine similarity between two tensors
+        x: N x D
+        y: M x D
+        '''
+        # 正規化向量
+        x_norm = F.normalize(x, p=2, dim=1)
+        y_norm = F.normalize(y, p=2, dim=1)
         
-    def compute_prototypes(self, input, support_idxs):
-        """Compute prototype vectors"""
-        return torch.stack([input[idx_list].mean(0) for idx_list in support_idxs])
-    
-    def get_nn_points(self, input, support_idxs):
-        """Get nearest neighbor points"""
-        return torch.cat([input[idx_list] for idx_list in support_idxs])
-    
-    def get_support_query_idxs(self, target):
-        """Split data into support and query sets"""
-        def supp_idxs(c):
-            return target.eq(c).nonzero()[:self.n_support].squeeze(1)
-        classes = torch.unique(target)
-        support_idxs = list(map(supp_idxs, classes))
-        query_idxs = torch.stack(list(map(
-            lambda c: target.eq(c).nonzero()[self.n_support:], classes
-        ))).view(-1)
+        # 計算余弦相似度
+        similarity = torch.mm(x_norm, y_norm.t())
         
-        return classes, support_idxs, query_idxs
+        return similarity
     
-    def compute_loss_and_acc(self, dists, n_classes, n_query):
+class CrossEntropyLoss(LossFunction):
+    @staticmethod
+    def compute(dists, n_classes, n_query):
         """
         使用CrossEntropyLoss計算損失和準確率
         
@@ -136,20 +131,63 @@ class Loss:
         
         return loss_val, acc_val
 
+
+DISTANCE_METRICS = {
+    'euclidean': EuclideanDistance,
+    'cosine_distance': CosineDistance,
+    'cosine_similarity': CosineSimilarity,
+    'manhattan': ManhattanDistance
+}
+
+LOSS_FUNCTIONS = {
+    'CrossEntropyLoss': CrossEntropyLoss
+}
+
+class Loss:
+    def __init__(self, n_support):
+        self.n_support = n_support
+        
+    def compute_prototypes(self, input, support_idxs):
+        """Compute prototype vectors"""
+        return torch.stack([input[idx_list].mean(0) for idx_list in support_idxs])
+    
+    def get_nn_points(self, input, support_idxs):
+        """Get nearest neighbor points"""
+        return torch.cat([input[idx_list] for idx_list in support_idxs])
+    
+    def get_support_query_idxs(self, target):
+        """Split data into support and query sets"""
+        def supp_idxs(c):
+            return target.eq(c).nonzero()[:self.n_support].squeeze(1)
+        classes = torch.unique(target)
+        support_idxs = list(map(supp_idxs, classes))
+        query_idxs = torch.stack(list(map(
+            lambda c: target.eq(c).nonzero()[self.n_support:], classes
+        ))).view(-1)
+        
+        return classes, support_idxs, query_idxs
+
+
 class ProtoLoss(Loss):
     """Prototypical Networks Loss with multiple distance metrics"""
     
     def __init__(self, opt: dict):
         self.metric_name = opt["settings"]["train"]["distance"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+        self.loss_fn_name = opt["settings"]["train"]["loss"]
         
         if self.metric_name not in DISTANCE_METRICS:
             raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
                            f"Supported metrics are: {list(DISTANCE_METRICS.keys())}")
+
+        if self.loss_fn_name not in LOSS_FUNCTIONS:
+            raise ValueError(f"Unsupported loss function: {self.loss_fn_name}. "
+                           f"Supported loss functions are: {list(LOSS_FUNCTIONS.keys())}")
         
         self.distance_metric = DISTANCE_METRICS[self.metric_name]
+        self.loss_fn = LOSS_FUNCTIONS[self.loss_fn_name]
         
-        super().__init__(self.metric_name, self.n_support, self.distance_metric)
+        super().__init__(self.n_support)
 
     def __call__(self, input, target):
         """
@@ -177,25 +215,37 @@ class ProtoLoss(Loss):
         query_samples = input_cpu[query_idxs]
         # 計算距離
         dists = self.distance_metric.compute(query_samples, prototypes)
+
+        if self.metric_name == 'cosine_similarity':
+            dists = -dists
         # 計算損失和準確率
-        return self.compute_loss_and_acc(dists, n_classes, n_query)
+        return self.loss_fn.compute(dists, n_classes, n_query)
 
     def get_metric_name(self):
         """返回當前使用的距離度量方法名稱"""
         return self.metric_name
 
-class NNLoss(Loss):
+    def get_loss_fn(self):
+        """返回當前使用的損失函數名稱"""
+        return self.loss_fn_name
+
+class NnLoss(Loss):
     def __init__(self, opt: dict):
         self.metric_name = opt["settings"]["train"]["distance"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+        self.loss_fn_name = opt["settings"]["train"]["loss"]
             
         if self.metric_name not in DISTANCE_METRICS:
             raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
                         f"Supported metrics are: {list(DISTANCE_METRICS.keys())}")
+        if self.loss_fn_name not in LOSS_FUNCTIONS:
+            raise ValueError(f"Unsupported loss function: {self.loss_fn_name}. "
+                        f"Supported loss functions are: {list(LOSS_FUNCTIONS.keys())}")
         
         self.distance_metric = DISTANCE_METRICS[self.metric_name]
+        self.loss_fn = LOSS_FUNCTIONS[self.loss_fn_name]
         
-        super().__init__(self.metric_name, self.n_support, self.distance_metric)
+        super().__init__(self.n_support)
     
     def __call__(self, input, target):
         target_cpu = target.cpu()
@@ -211,15 +261,22 @@ class NNLoss(Loss):
         
         dists = self.distance_metric.compute(query_samples, nn_points)
         
+        if self.metric_name == 'cosine_similarity':
+            dists = -dists
+
         # find the nearest neighbor for each query point
         dists_by_class = dists.view(n_classes*n_query, n_classes, self.n_support)
         min_dists, _ = dists_by_class.min(dim=2)
         
-        return self.compute_loss_and_acc(min_dists, n_classes, n_query)
+        return self.loss_fn.compute(min_dists, n_classes, n_query)
+    
+    def get_metric_name(self):
+        return self.metric_name
+    
+    def get_loss_fn(self):
+        return self.loss_fn_name
         
 
 class DCELoss:
-    
     def __init__(self, opt: dict):
-        
         super(DCELoss, self).__init__()
