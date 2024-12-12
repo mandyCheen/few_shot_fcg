@@ -167,8 +167,7 @@ class Training:
         lowest_val_loss = 1000
         patience = 0
         stop = False
-
-        os.makedirs(self.model_folder, exist_ok=True)
+        
         # save config
         save_config(self.opt, self.model_folder + "/config.json")
         # save model architecture
@@ -248,7 +247,7 @@ class Training:
                 # lowest_train_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_train_loss, epoch, patience, backbone)
             if stop:
                 break
-        self.plot_accuracy()
+        # self.plot_accuracy()
         return True
 
 class Testing:

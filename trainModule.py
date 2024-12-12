@@ -10,7 +10,7 @@ from torch_geometric.loader import DataLoader # !
 from loss import *
 from datetime import datetime
 from train_utils import Training, Testing, load_GE_data
-from utils import load_config
+from utils import load_config, record_log
 
 def collate_graphs(batch):
     return Batch.from_data_list(batch)
@@ -46,6 +46,8 @@ class TrainModule(Training):
 
         now = datetime.now()
         self.model_folder = opt["paths"]["model"]["model_folder"] + "/" + opt["settings"]["name"] + "_" + now.strftime("%Y%m%d_%H%M%S")
+        os.makedirs(self.model_folder, exist_ok=True)
+        self.log_file = self.model_folder + "/log.txt"
    
         self.setting()
 
@@ -74,24 +76,29 @@ class TrainModule(Training):
             checkpoint = torch.load(info["load_weights"], map_location=self.device)
             self.model.load_state_dict(checkpoint["model_state_dict"], strict=False)
             print(f"Model loaded from {info['load_weights']}")
+            record_log(self.log_file, f"Model loaded from {info['load_weights']}\n")
+            
         
         if torch.cuda.is_available() and self.device == "cpu":
             print("CUDA is available, but you are using CPU")
         print(f"Device: {self.device}")
+        record_log(self.log_file, f"Device: {self.device}\n")
 
         if self.parallel and len(self.parallel_device) > 1:
             self.model = torch.nn.DataParallel(self.model.to(self.device), device_ids=self.parallel_device) 
         elif self.parallel:
             print("You didn't specify the device ids for parallel training")
+            record_log(self.log_file, "You didn't specify the device ids for parallel training\n")
             print("Using all available devices", torch.cuda.device_count(), "GPUs")       
+            record_log(self.log_file, f"Using all available devices {torch.cuda.device_count()} GPUs\n")
             self.model = torch.nn.DataParallel(self.model.to(self.device))
         else:
             self.model = self.model.to(self.device)
     def get_loss_fn(self):
         if self.opt["settings"]["few_shot"]["method"] == "ProtoNet":
             loss_fn = ProtoLoss(self.opt)
-        elif self.opt["settings"]["few_shot"]["method"] == "NNNet":
-            loss_fn = NNLoss(self.opt)
+        elif self.opt["settings"]["few_shot"]["method"] == "NnNet":
+            loss_fn = NnLoss(self.opt)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -171,10 +178,13 @@ class TrainModule(Training):
 
         self.get_backbone()
         print(f"Model: {self.model}")
+        record_log(self.log_file, f"Model: {self.model}\n")
         self.get_loss_fn()
         print(f"Loss function: {self.loss_fn}")
+        record_log(self.log_file, f"Loss function: {self.loss_fn}\n")
         self.get_optimizer()
         print(f"Optimizer: {self.optim}") 
+        record_log(self.log_file, f"Optimizer: {self.optim}\n")
         if self.lr_scheduler:
             self.get_lr_scheduler()
             
@@ -183,8 +193,10 @@ class TrainModule(Training):
 
     def train(self):
         print("Start training...")
+        record_log(self.log_file, "Start training...\n")
         self.run()
         print("Finish training")
+        record_log(self.log_file, "Finish training\n")
 
             
 class TestModule(Testing):
