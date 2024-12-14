@@ -276,7 +276,35 @@ class NnLoss(Loss):
     def get_loss_fn(self):
         return self.loss_fn_name
         
+class ClassifierLoss(Loss):
+    def __init__(self, opt: dict):
+        self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+        self.loss_fn = opt["settings"]["train"]["loss"]
 
+        if self.loss_fn == "CrossEntropyLoss":
+            self.criterion = nn.CrossEntropyLoss()
+        elif self.loss_fn == "MSELoss":
+            self.criterion = nn.MSELoss()
+        elif self.loss_fn == "NLLLoss":
+            self.criterion = nn.NLLLoss()
+        
+        super().__init__(self.n_support)
+        
+    def __call__(self, input, target):
+        target_cpu = target.cpu()
+        input_cpu = input.cpu()
+        
+        classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
+        n_classes = len(classes)
+        n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        
+        # get support values
+        support_samples = input_cpu[support_idxs]
+        
+        loss = self.criterion(support_samples, target_cpu[support_idxs])
+        acc = torch.sum(torch.argmax(support_samples, dim=1) == target_cpu[support_idxs]).item() / len(support_idxs)
+        
+        return loss, acc
 class DCELoss:
     def __init__(self, opt: dict):
         super(DCELoss, self).__init__()

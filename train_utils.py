@@ -155,7 +155,6 @@ class Training:
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
         return lowest_loss, patience, False
 
-
     def run(self, backbone=False, mode = "custom"):
         train_loss = []
         train_acc = []
@@ -183,9 +182,9 @@ class Training:
                     predicts = self.model(data)
                     if mode == "custom":
                         loss, acc = self.loss_fn(predicts, data.y)
-                    elif mode == "classification":
+                    elif mode == "classification_pretrain":
                         loss = self.loss_fn(predicts, data.y)
-                        acc = torch.sum(torch.argmax(predicts, dim=1) == data.y) / len(data.y)
+                        acc = torch.sum(torch.argmax(predicts, dim=1) == data.y) / len(data.y)              
                     loss.backward()
                     self.optim.step()   
                     
@@ -221,7 +220,7 @@ class Training:
                             model_output = self.model(data)
                             if mode == "custom":
                                 loss, acc = self.loss_fn(model_output, data.y)
-                            elif mode == "classification":
+                            elif mode == "classification_pretrain":
                                 loss= self.loss_fn(model_output, data.y)
                                 acc = torch.sum(torch.argmax(model_output, dim=1) == data.y) / len(data.y)
                         val_loss.append(loss.item())

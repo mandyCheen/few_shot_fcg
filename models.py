@@ -173,6 +173,14 @@ class GraphClassifier(torch.nn.Module):
                 num_layers=backbone_num_layers,
                 projection=projection
             )
+        elif backbone_type.lower() == 'gin':
+            self.backbone = GIN(
+                dim_in=backbone_dim_in,
+                dim_h=backbone_dim_h,
+                dim_out=backbone_dim_out,
+                num_layers=backbone_num_layers,
+                projection=projection
+            )
         else:
             raise ValueError(f"Unsupported backbone type: {backbone_type}")
 

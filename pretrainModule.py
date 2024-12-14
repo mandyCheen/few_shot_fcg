@@ -122,5 +122,5 @@ class PretrainModule(Training):
     def train(self):
         training = Training(self.opt, self.train_loader, self.val_loader, self.model, self.criterion, self.optimizer, self.scheduler, self.device, self.model_folder)
         print("Start training...")
-        self.run(backbone=True, mode="classification")
-        print("Finish training")
+        self.run(backbone=True, mode="classification_pretrain")
+        print("Finish training...")

@@ -28,7 +28,7 @@ class LoadDataset:
             val = "_withVal" if self.val else ""
             pretrain_ = "_withPretrain" if opt["pretrain"]["use"] else ""
             self.familyCpuList = self.rawDataset.groupby("family")["CPU"].unique().to_dict()
-            self.datasetName = f"{self.cpuArch}{splitByCpu}{val}{pretrain_}_{self.reverseTool}"
+            self.datasetName = f"{self.cpuArch}{splitByCpu}{val}{pretrain_}_{self.reverseTool}_{self.seed}"
             self.trainData, self.testData, self.valData = self.load_all_datasets()
     
     def write_split_dataset(self, mode, familyList) -> None:

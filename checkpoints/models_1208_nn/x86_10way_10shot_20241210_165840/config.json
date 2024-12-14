@@ -27,7 +27,7 @@
             "output_size": 128,
             "num_layers": 2,
             "projection": true,
-            "load_weights": ""
+            "load_weights": "pretrained/x86_pretrained_20241121_1653/epoch_2060_best_backbone.pth"
         },
         "train": {
             "training": true,
@@ -41,7 +41,7 @@
             "projection_lr": 0.01,
             "lr_scheduler": {
                 "use": true,
-                "method": "ReduceLROnPlateau", 
+                "method": "ReduceLROnPlateau",
                 "step_size": 20,
                 "gamma": 0.5,
                 "patience": 10,
@@ -57,7 +57,7 @@
             "save_model": true
         },
         "few_shot": {
-            "method": "ProtoNet",
+            "method": "NnNet",
             "train": {
                 "support_shots": 10,
                 "query_shots": 10,
@@ -85,7 +85,7 @@
             "pretrain_dataset": "./dataset/data_ghidra_fcg_pretrain"
         },
         "model": {
-            "model_folder": "./models_1210_without_pretrain_proto",
+            "model_folder": ".checkpoints/models_1208_nn",
             "pretrained_folder": "./pretrained"
         }
     }
