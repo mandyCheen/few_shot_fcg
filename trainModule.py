@@ -28,6 +28,7 @@ class TrainModule(Training):
         self.testGraph = []
         self.loss_fn = None
         self.opt = opt
+        self.datasetName = dataset.datasetName
 
         self.support_shots_train = opt["settings"]["few_shot"]["train"]["support_shots"]
         self.query_shots_train = opt["settings"]["few_shot"]["train"]["query_shots"]
@@ -45,7 +46,7 @@ class TrainModule(Training):
         self.parallel_device = opt["settings"]["train"]["parallel_device"]
 
         now = datetime.now()
-        self.model_folder = opt["paths"]["model"]["model_folder"] + "/" + opt["settings"]["name"] + "_" + now.strftime("%Y%m%d_%H%M%S")
+        self.model_folder = opt["paths"]["model"]["model_folder"] + "/" + self.datasetName + "/" + opt["settings"]["name"] + "_" + now.strftime("%Y%m%d_%H%M%S")
         os.makedirs(self.model_folder, exist_ok=True)
         self.log_file = self.model_folder + "/log.txt"
    
@@ -60,7 +61,7 @@ class TrainModule(Training):
             optim=self.optim,
             scheduler=self.scheduler if self.lr_scheduler else None,
             device=self.device,
-            model_path=self.model_folder
+            model_path=self.model_folder,
         )
 
     def get_backbone(self):
@@ -192,6 +193,17 @@ class TrainModule(Training):
         print("Finish setting up the training module")
 
     def train(self):
+
+        print("Copying split files...")
+        splitFolder = self.opt["paths"]["data"]["split_folder"]
+        splitFiles = [f for f in os.listdir(splitFolder) if f.endswith(f"{self.datasetName}.txt")]
+        for f in splitFiles:
+            src = os.path.join(splitFolder, f)
+            dst = os.path.join(self.opt["paths"]["model"]["model_folder"] + "/" + self.datasetName, f)
+            if not os.path.exists(dst):
+                os.system(f"cp {src} {dst}")
+        print("Finish copying split files")
+        
         print("Start training...")
         record_log(self.log_file, "Start training...\n")
         self.run()
@@ -270,14 +282,6 @@ class TestModule(Testing):
         evalFolder = os.path.dirname(model_path)
         logFolder = self.opt["paths"]["model"]["model_folder"]
 
-        print("Copying split files...")
-        splitFolder = self.opt["paths"]["data"]["split_folder"]
-        splitFiles = [f for f in os.listdir(splitFolder) if f.endswith(f"{self.datasetName}.txt")]
-        for f in splitFiles:
-            src = os.path.join(splitFolder, f)
-            dst = os.path.join(evalFolder, f)
-            os.system(f"cp {src} {dst}")
-        
         print("Record evaluation log...")
         evalLogPath = os.path.join(logFolder, "evalLog.csv")
         if not os.path.exists(evalLogPath):

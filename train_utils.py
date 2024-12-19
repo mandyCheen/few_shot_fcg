@@ -65,7 +65,8 @@ class Training:
         self.early_stopping = opt["settings"]["train"]["early_stopping"]["use"]
         self.early_stopping_patience = opt["settings"]["train"]["early_stopping"]["patience"]
 
-        self.model_folder = model_path        
+        self.model_folder = model_path     
+        os.makedirs(self.model_folder, exist_ok=True)   
         self.log_file = self.model_folder + "/log.txt"
 
         self.train_acc_history = []
