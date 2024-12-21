@@ -47,6 +47,7 @@ class TrainModule(Training):
 
         now = datetime.now()
         self.model_folder = opt["paths"]["model"]["model_folder"] + "/" + self.datasetName + "/" + opt["settings"]["name"] + "_" + now.strftime("%Y%m%d_%H%M%S")
+        self.pretrain_folder = opt["paths"]["model"]["pretrained_folder"]
         os.makedirs(self.model_folder, exist_ok=True)
         self.log_file = self.model_folder + "/log.txt"
    
@@ -74,10 +75,12 @@ class TrainModule(Training):
             raise ValueError("Model not supported")
         
         if(info["load_weights"]):
-            checkpoint = torch.load(info["load_weights"], map_location=self.device)
+            model_folder = os.path.join(self.pretrain_folder, info["load_weights"])
+            model_path = os.path.join(model_folder, [f for f in os.listdir(model_folder) if "best_backbone" in f][0])
+            checkpoint = torch.load(model_path, map_location=self.device)
             self.model.load_state_dict(checkpoint["model_state_dict"], strict=False)
-            print(f"Model loaded from {info['load_weights']}")
-            record_log(self.log_file, f"Model loaded from {info['load_weights']}\n")
+            print(f"Model loaded from {model_path}")
+            record_log(self.log_file, f"Model loaded from {model_path}\n")
             
         
         if torch.cuda.is_available() and self.device == "cpu":

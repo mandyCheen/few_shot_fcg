@@ -2,15 +2,11 @@
 
 config_dir="./config"
 
-
-factors=(
-    # 1: 5way_5shot, 2: 5way_10shot, 3: 10way_5shot, 4: 10way_10shot
-    "expSet: [1, 2, 3, 4]"
-    # 1: ProtoNet, 2: NnNet
-    "decisionNet: [1, 2]"
-    # 1: with_pretrain, 2: without_pretrain
-    "pretrain: [1, 2]"
-)
+# 設定實驗參數陣列
+declare -A factors
+factors["expSet"]="1 2 3 4"          # 實驗設定：5way5shot, 5way10shot, 10way5shot, 10way10shot
+factors["decisionNet"]="1 2"         # 決策網路：ProtoNet, NnNet
+factors["pretrain"]="1 2"            # 預訓練：with_pretrain, without_pretrain
 
 generate_config() {
     local datasetName=$1
@@ -19,6 +15,18 @@ generate_config() {
     local pretrain=$4
     local cudaDevice=$5
     local seed=$6
+    local logFile=$7
+
+    local expName=""
+    local decisionNetName=""
+    local pretrainName=""
+    local lr=0.0
+    local projection_lr=0.0
+    local weight=""
+    local support_shots=0
+    local query_shots=0
+    local class_per_iter=0
+
     
     config_file="${config_dir}/config_${datasetName}.json"
     
@@ -26,45 +34,57 @@ generate_config() {
         rm $config_file
     fi
 
-    if [ expSet -eq 1 ]; then
+    if [ $expSet -eq 1 ]; then
         expName="5way_5shot"
         support_shots=5
         query_shots=15
         class_per_iter=5
-    elif [ expSet -eq 2 ]; then
+    elif [ $expSet -eq 2 ]; then
         expName="5way_10shot"
         support_shots=10
         query_shots=10
         class_per_iter=5
-    elif [ expSet -eq 3 ]; then
+    elif [ $expSet -eq 3 ]; then
         expName="10way_5shot"
         support_shots=5
         query_shots=15
         class_per_iter=10
-    elif [ expSet -eq 4 ]; then
+    elif [ $expSet -eq 4 ]; then
         expName="10way_10shot"
         support_shots=10
         query_shots=10
         class_per_iter=10
     fi
 
-    if [ decisionNet -eq 1 ]; then
+    if [ $decisionNet -eq 1 ]; then
         decisionNetName="ProtoNet"
-    elif [ decisionNet -eq 2 ]; then
+    elif [ $decisionNet -eq 2 ]; then
         decisionNetName="NnNet"
     fi
 
-    if [ pretrain -eq 1 ]; then
+    if [ $pretrain -eq 1 ]; then
         pretrainName="with_pretrain"
         lr=0.0005
         projection_lr=0.001
-        weight="pretrained/x86_pretrained_20241121_1653"
-    elif [ pretrain -eq 2 ]; then
+        weight="x86_pretrained_20241121_1653"
+    elif [ $pretrain -eq 2 ]; then
         pretrainName="without_pretrain"
         lr=0.001
         projection_lr=0.001
         weight=""
     fi
+
+    # 記錄到日誌檔案
+    {
+        echo "======================================"
+        echo "Experiment Set: $expName"
+        echo "Decision Network: $decisionNetName"
+        echo "Pretrain: $pretrainName"
+        echo "Timestamp: $(date)"
+        echo "======================================"
+    } >> $logFile
+    
+
 
     # 創建配置檔案
     cat > $config_file << EOL
@@ -130,14 +150,14 @@ generate_config() {
             "use": false,
             "method": "${decisionNetName}",
             "train": {
-                "support_shots": 5,
-                "query_shots": 15,
-                "class_per_iter": 5
+                "support_shots": ${support_shots},
+                "query_shots": ${query_shots},
+                "class_per_iter": ${class_per_iter}
             },
             "test": {
-                "support_shots": 5,
-                "query_shots": 15,
-                "class_per_iter": 5
+                "support_shots": ${support_shots},
+                "query_shots": ${query_shots},
+                "class_per_iter": ${class_per_iter}
             }
         },
         "vectorize": {
@@ -171,6 +191,7 @@ run_experiment() {
     local expSet=$2
     local decisionNet=$3
     local pretrain=$4
+    local logFile=$5
     
     echo "Experiment: ${expSet}"
     echo "Decision Network: ${decisionNet}"
@@ -181,11 +202,16 @@ run_experiment() {
     
     # 檢查實驗是否成功
     if [ $? -eq 0 ]; then
-        echo "Successfully completed the experiment"
+        echo "Successfully completed the experiment" >> $logFile
     else
-        echo "Failed to complete the experiment"
+        echo "Failed to complete the experiment" >> $logFile
     fi
 }
+
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <random_seed> <cuda_device>"
+    exit 1
+fi
 
 datasetName="NICT_Ghidra_x86_64"
 
@@ -194,14 +220,26 @@ echo "Dataset: $datasetName"
 echo "Random Seed: $1"
 echo "CUDA Device Number: $2"
 
-$datasetName = $datasetName + "_$1"
+datasetName="${datasetName}_${1}"
+logFile="log_${datasetName}.txt"
 
+> $logFile
+
+# 迴圈執行實驗
 for expSet in ${factors["expSet"]}; do
     for decisionNet in ${factors["decisionNet"]}; do
         for pretrain in ${factors["pretrain"]}; do
-            generate_config $datasetName $expSet $decisionNet $pretrain $2 $1
-            run_experiment "${config_dir}/config_${datasetName}.json" $expSet $decisionNet $pretrain
+            echo "Experiment Set: $expSet"
+            echo "Decision Network: $decisionNet"
+            echo "Pretrain: $pretrain"
 
+            # 生成配置檔案
+            generate_config "$datasetName" "$expSet" "$decisionNet" "$pretrain" "$2" "$1" "$logFile"
+            
+            # 執行實驗
+            run_experiment "${config_dir}/config_${datasetName}.json" "$expSet" "$decisionNet" "$pretrain" "$logFile"
+            
+            # 休息一下
             sleep 2
         done
     done

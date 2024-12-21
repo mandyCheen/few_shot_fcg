@@ -1,7 +1,7 @@
 import argparse
 from utils import load_config
 from loadDataset import LoadDataset
-from trainModule import TrainModule
+from trainModule import TrainModule, TestModule
 from fcgVectorize import FCGVectorize
 
 def parse_args():
@@ -21,3 +21,12 @@ if __name__ == '__main__':
     
     train = TrainModule(options, dataset)
     train.train()
+
+    configPath = train.model_folder + "/config.json"
+
+    Testoptions = load_config(configPath)
+    
+    dataset = LoadDataset(Testoptions)
+    
+    test = TestModule(args.config, dataset)
+    test.eval()
