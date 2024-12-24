@@ -19,7 +19,7 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "x86_5way_5shot",
+        "name": "TestModel",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
@@ -27,18 +27,18 @@
             "output_size": 128,
             "num_layers": 2,
             "projection": true,
-            "load_weights": "pretrained/x86_pretrained_20241121_1653"
+            "load_weights": "x86_pretrained_20241121_1653"
         },
         "train": {
             "training": true,
             "validation": true,
-            "num_epochs": 5000,
+            "num_epochs": 1,
             "device": "cuda:0",
             "parallel": false,
             "parallel_device": [],
             "iterations": 100,
-            "lr": 0.0001,
-            "projection_lr": 0.0001,
+            "lr": 0.001,
+            "projection_lr": 0.001,
             "lr_scheduler": {
                 "use": true,
                 "method": "ReduceLROnPlateau",
@@ -49,7 +49,7 @@
             },
             "early_stopping": {
                 "use": true,
-                "patience":  40
+                "patience":  30
             },
             "loss": "CrossEntropyLoss",
             "distance": "euclidean",
@@ -82,11 +82,11 @@
             "fcg_dataset": "./dataset/data_ghidra_fcg",
             "csv_folder": "./dataset/raw_csv",
             "split_folder": "./dataset/split",
-            "embedding_folder": "/mnt/ssd2t/mandy/Projects/few_shot_fcg/embeddings",
+            "embedding_folder": "./embeddings",
             "pretrain_dataset": "./dataset/data_ghidra_fcg_pretrain"
         },
         "model": {
-            "model_folder": "./checkpoints/test",
+            "model_folder": "./checkpoints",
             "pretrained_folder": "./pretrained"
         }
     }

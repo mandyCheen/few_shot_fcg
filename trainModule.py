@@ -235,6 +235,7 @@ class TestModule(Testing):
         self.device = opt["settings"]["train"]["device"]
         self.embeddingSize = opt["settings"]["vectorize"]["node_embedding_size"]
 
+        self.pretrain_folder = opt["paths"]["model"]["pretrained_folder"]
         self.setting()
 
         super().__init__(
@@ -283,7 +284,7 @@ class TestModule(Testing):
             model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
             
         evalFolder = os.path.dirname(model_path)
-        logFolder = self.opt["paths"]["model"]["model_folder"]
+        logFolder = self.opt["paths"]["model"]["model_folder"] + "/" + self.datasetName
 
         print("Record evaluation log...")
         evalLogPath = os.path.join(logFolder, "evalLog.csv")
@@ -306,8 +307,9 @@ class TestModule(Testing):
 
         with open(evalLogPath, "a") as f:
             f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {valAcc}\n")
-
-        pretrainModelPath = self.opt["settings"]["model"]["load_weights"]
+        
+        pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["load_weights"])
+        pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
         if pretrainModelPath != "":
             self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
         print(f"Ablation evaluation... (testing dataset)")
@@ -317,8 +319,7 @@ class TestModule(Testing):
         print(f"Ablation evaluation... (validation dataset)")
         valAccPretrain = self.testing(self.pretrainModel, self.valLoader)
         
-        print("Finish evaluation")
-        
         with open(evalLogPath, "a") as f:
             f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}, {valAccPretrain}\n")
             
+        print("Finish evaluation")

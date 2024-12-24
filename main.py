@@ -3,6 +3,8 @@ from utils import load_config
 from loadDataset import LoadDataset
 from trainModule import TrainModule, TestModule
 from fcgVectorize import FCGVectorize
+import warnings
+warnings.filterwarnings("ignore")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Few Shot FCG")
@@ -20,13 +22,22 @@ if __name__ == '__main__':
     vectorize.node_embedding(dataset.rawDataset)
     
     train = TrainModule(options, dataset)
-    train.train()
+    errorPath = train.model_folder + "/error.txt"
+    try:
+        train.train()
+    except Exception as e:
+        with open(errorPath, "w") as f:
+            f.write(str(e))
+            
+    testConfigPath = train.model_folder + "/config.json"
 
-    configPath = train.model_folder + "/config.json"
-
-    Testoptions = load_config(configPath)
+    Testoptions = load_config(testConfigPath)
     
-    dataset = LoadDataset(Testoptions)
-    
-    test = TestModule(args.config, dataset)
-    test.eval()
+    testDataset = LoadDataset(Testoptions)
+    testErrorPath = train.model_folder + "/testError.txt"
+    try:
+        test = TestModule(testConfigPath, testDataset)
+        test.eval()
+    except Exception as e:
+        with open(testErrorPath, "w") as f:
+            f.write(str(e))
