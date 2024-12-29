@@ -19,7 +19,7 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "10way_5shot_ProtoNet_with_pretrain",
+        "name": "10way_10shot_NnNet_without_pretrain",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
@@ -27,18 +27,18 @@
             "output_size": 128,
             "num_layers": 2,
             "projection": true,
-            "load_weights": "x86_pretrained_20241121_1653"
+            "load_weights": ""
         },
         "train": {
             "training": true,
             "validation": true,
             "num_epochs": 500,
-            "device": "cuda:1",
+            "device": "cuda:0",
             "parallel": false,
             "parallel_device": [],
             "iterations": 100,
-            "lr": 0.0005,
-            "projection_lr": 0.001,
+            "lr": 0.005,
+            "projection_lr": 0.005,
             "lr_scheduler": {
                 "use": true,
                 "method": "ReduceLROnPlateau",
@@ -49,7 +49,7 @@
             },
             "early_stopping": {
                 "use": true,
-                "patience":  30
+                "patience":  20
             },
             "loss": "CrossEntropyLoss",
             "distance": "euclidean",
@@ -57,16 +57,15 @@
             "save_model": true
         },
         "few_shot": {
-            "use": false,
-            "method": "ProtoNet",
+            "method": "NnNet",
             "train": {
-                "support_shots": 5,
-                "query_shots": 15,
+                "support_shots": 10,
+                "query_shots": 10,
                 "class_per_iter": 10
             },
             "test": {
-                "support_shots": 5,
-                "query_shots": 15,
+                "support_shots": 10,
+                "query_shots": 10,
                 "class_per_iter": 10
             }
         },
@@ -82,7 +81,7 @@
             "fcg_dataset": "./dataset/data_ghidra_fcg",
             "csv_folder": "./dataset/raw_csv",
             "split_folder": "./dataset/split",
-            "embedding_folder": "./embeddings",
+            "embedding_folder": "/mnt/ssd2t/mandy/Projects/few_shot_fcg/embeddings",
             "pretrain_dataset": "./dataset/data_ghidra_fcg_pretrain"
         },
         "model": {

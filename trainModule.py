@@ -308,10 +308,12 @@ class TestModule(Testing):
         with open(evalLogPath, "a") as f:
             f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {valAcc}\n")
         
-        pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["load_weights"])
-        pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
-        if pretrainModelPath != "":
+        if self.opt["settings"]["model"]["load_weights"] != "":
+            pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["load_weights"])
+            pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
             self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
+        else:
+            pretrainModelPath = "None"
         print(f"Ablation evaluation... (testing dataset)")
         self.pretrainModel = self.pretrainModel.to(self.device)
         

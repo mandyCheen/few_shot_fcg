@@ -80,13 +80,13 @@ generate_config() {
 
     if [ $pretrain -eq 1 ]; then
         pretrainName="with_pretrain"
-        lr=0.0005
+        lr=0.001
         projection_lr=0.001
         weight="x86_pretrained_20241121_1653"
     elif [ $pretrain -eq 2 ]; then
         pretrainName="without_pretrain"
-        lr=0.001
-        projection_lr=0.001
+        lr=0.005
+        projection_lr=0.005
         weight=""
     fi
 
@@ -155,7 +155,7 @@ generate_config() {
             },
             "early_stopping": {
                 "use": true,
-                "patience":  30
+                "patience":  20
             },
             "loss": "CrossEntropyLoss",
             "distance": "euclidean",
@@ -163,7 +163,6 @@ generate_config() {
             "save_model": true
         },
         "few_shot": {
-            "use": false,
             "method": "${decisionNetName}",
             "train": {
                 "support_shots": ${support_shots},
@@ -188,7 +187,7 @@ generate_config() {
             "fcg_dataset": "./dataset/data_ghidra_fcg",
             "csv_folder": "./dataset/raw_csv",
             "split_folder": "./dataset/split",
-            "embedding_folder": "./embeddings",
+            "embedding_folder": "/mnt/ssd2t/mandy/Projects/few_shot_fcg/embeddings",
             "pretrain_dataset": "./dataset/data_ghidra_fcg_pretrain"
         },
         "model": {

@@ -257,15 +257,17 @@ class Testing:
     
     def testing(self, testModel, testLoader):
         avg_acc = list()
-        for data in tqdm(testLoader, desc="Testing"):
-            testModel.eval()
-            # print(np.unique(data.y))
-            data = data.to(self.device)
-            with torch.no_grad():
-                model_output = testModel(data)
-                loss, acc = self.loss_fn(model_output, data.y)
-                
-                avg_acc.append(acc.item())
+        for epoch in range(10):
+            print(f"Epoch {epoch+1}")
+            for data in tqdm(testLoader, desc="Testing"):
+                testModel.eval()
+                # print(np.unique(data.y))
+                data = data.to(self.device)
+                with torch.no_grad():
+                    model_output = testModel(data)
+                    loss, acc = self.loss_fn(model_output, data.y)
+                    
+                    avg_acc.append(acc.item())
                     
         avg_acc = np.mean(avg_acc)
         print(f"Testing accuracy: {avg_acc:.4f}")

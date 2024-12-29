@@ -28,6 +28,7 @@ if __name__ == '__main__':
     except Exception as e:
         with open(errorPath, "w") as f:
             f.write(str(e))
+        raise
             
     testConfigPath = train.model_folder + "/config.json"
 
@@ -41,3 +42,4 @@ if __name__ == '__main__':
     except Exception as e:
         with open(testErrorPath, "w") as f:
             f.write(str(e))
+        raise

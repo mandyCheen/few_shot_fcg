@@ -19,7 +19,7 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "5way_10shot_ProtoNet_without_pretrain",
+        "name": "5way_5shot_ProtoNet_without_pretrain",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
@@ -37,8 +37,8 @@
             "parallel": false,
             "parallel_device": [],
             "iterations": 100,
-            "lr": 0.001,
-            "projection_lr": 0.001,
+            "lr": 0.005,
+            "projection_lr": 0.005,
             "lr_scheduler": {
                 "use": true,
                 "method": "ReduceLROnPlateau",
@@ -49,7 +49,7 @@
             },
             "early_stopping": {
                 "use": true,
-                "patience":  30
+                "patience":  20
             },
             "loss": "CrossEntropyLoss",
             "distance": "euclidean",
@@ -57,16 +57,15 @@
             "save_model": true
         },
         "few_shot": {
-            "use": false,
             "method": "ProtoNet",
             "train": {
-                "support_shots": 10,
-                "query_shots": 10,
+                "support_shots": 5,
+                "query_shots": 15,
                 "class_per_iter": 5
             },
             "test": {
-                "support_shots": 10,
-                "query_shots": 10,
+                "support_shots": 5,
+                "query_shots": 15,
                 "class_per_iter": 5
             }
         },
@@ -82,7 +81,7 @@
             "fcg_dataset": "./dataset/data_ghidra_fcg",
             "csv_folder": "./dataset/raw_csv",
             "split_folder": "./dataset/split",
-            "embedding_folder": "./embeddings",
+            "embedding_folder": "/mnt/ssd2t/mandy/Projects/few_shot_fcg/embeddings",
             "pretrain_dataset": "./dataset/data_ghidra_fcg_pretrain"
         },
         "model": {
