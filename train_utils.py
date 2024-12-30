@@ -25,9 +25,9 @@ def load_GE_data(dataset: pd.DataFrame, embeddingFolder: str, embeddingSize: int
                 fcg = pickle.load(f)
             for node in fcg.nodes:
                 if len(fcg.nodes[node]["x"]) == 0:
-                    fcg.nodes[node]["x"] = torch.zeros(embeddingSize)
+                    fcg.nodes[node]["x"] = torch.zeros(embeddingSize, dtype=torch.float32)
                 if not isinstance(fcg.nodes[node]["x"], torch.Tensor):
-                    fcg.nodes[node]["x"] = torch.tensor(fcg.nodes[node]["x"])
+                    fcg.nodes[node]["x"] = torch.tensor(fcg.nodes[node]["x"], dtype=torch.float32)
             torch_data = from_networkx(fcg)
             labels.append(family)
             graphList.append(torch_data)
