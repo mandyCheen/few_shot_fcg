@@ -1,6 +1,7 @@
 #!/bin/bash
 
 config_dir="./config"
+continue=false
 
 # 設定實驗參數陣列
 declare -A factors
@@ -12,15 +13,16 @@ factors["pretrain"]="1 2"            # 預訓練：with_pretrain, without_pretra
 show_help() {
     cat << EOF
 使用方法：
-    $0 --seed <random_seed> --cuda <cuda_device>
+    $0 --seed <random_seed> --cuda <cuda_device> [--continue]
 
 參數說明：
     --help          顯示此幫助訊息
     --seed          設定隨機種子
     --cuda          設定 CUDA 裝置編號
+    --continue      從指定的日誌檔案繼續執行實驗(optional)
 
 範例：
-    $0 --seed 42 --cuda 0
+    $0 --seed 42 --cuda 0 --continue
 EOF
 }
 
@@ -239,6 +241,10 @@ while [[ $# -gt 0 ]]; do
             cuda="$2"
             shift 2
             ;;
+        --continue)
+            continue=true
+            shift 1
+            ;;
         *)
             echo "未知的參數: $1"
             show_help
@@ -254,6 +260,49 @@ if [ -z "$seed" ] || [ -z "$cuda" ]; then
     exit 1
 fi
 
+check_experiment_completed() {
+    local logFile=$1
+    local expSet=$2
+    local decisionNet=$3
+    local pretrain=$4
+    
+    # 將參數轉換為日誌中的格式
+    local expName=""
+    local decisionNetName=""
+    local pretrainName=""
+    
+    # 設定實驗名稱對應
+    case $expSet in
+        1) expName="5way_5shot" ;;
+        2) expName="5way_10shot" ;;
+        3) expName="10way_5shot" ;;
+        4) expName="10way_10shot" ;;
+    esac
+    
+    case $decisionNet in
+        1) decisionNetName="ProtoNet" ;;
+        2) decisionNetName="NnNet" ;;
+    esac
+    
+    case $pretrain in
+        1) pretrainName="with_pretrain" ;;
+        2) pretrainName="without_pretrain" ;;
+    esac
+    
+    # 檢查日誌文件是否存在
+    if [ ! -f "$logFile" ]; then
+        return 1
+    fi
+    
+    # 檢查實驗是否成功完成
+    if grep -A 2 "Experiment Set: $expName.*Decision Network: $decisionNetName.*Pretrain: $pretrainName" "$logFile" | grep -q "Successfully completed the experiment"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
 datasetName="NICT_Ghidra_x86_64"
 
 echo "Implementing Few-Shot Learning for Malware Classification"
@@ -262,9 +311,24 @@ echo "Random Seed: $seed"
 echo "CUDA Device Number: $cuda"
 
 datasetName="${datasetName}_${seed}"
-logFile="./logs/log_${datasetName}.txt"
+default_logFile="./logs/log_${datasetName}.txt"
 
-> $logFile
+if [ "$continue" = true ]; then
+    if [ -f "$default_logFile" ]; then
+        echo "Continuing from existing log file: $default_logFile"
+        logFile="$default_logFile"
+    else
+        echo "No existing log file found at $default_logFile"
+        echo "Creating new log file..."
+        logFile="$default_logFile"
+        > $logFile
+    fi
+else
+    echo "Starting new experiment..."
+    logFile="$default_logFile"
+    > $logFile
+fi
+
 
 # 迴圈執行實驗
 for expSet in ${factors["expSet"]}; do
@@ -274,13 +338,14 @@ for expSet in ${factors["expSet"]}; do
             echo "Decision Network: $decisionNet"
             echo "Pretrain: $pretrain"
 
-            # 生成配置檔案
+            if check_experiment_completed "$logFile" "$expSet" "$decisionNet" "$pretrain"; then
+                echo "Experiment already completed successfully, skipping..."
+                continue
+            fi
+
             generate_config "$datasetName" "$expSet" "$decisionNet" "$pretrain" "$cuda" "$seed" "$logFile"
-            
-            # 執行實驗
             run_experiment "${config_dir}/config_${datasetName}.json" "$expSet" "$decisionNet" "$pretrain" "$logFile"
             
-            # 休息一下
             sleep 2
         done
     done
