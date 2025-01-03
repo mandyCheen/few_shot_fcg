@@ -74,6 +74,7 @@ class TrainModule(Training):
         else:
             raise ValueError("Model not supported")
         
+        # TODO split pretrain model & load model in training
         if(info["load_weights"]):
             model_folder = os.path.join(self.pretrain_folder, info["load_weights"])
             model_path = os.path.join(model_folder, [f for f in os.listdir(model_folder) if "best_backbone" in f][0])
@@ -308,6 +309,7 @@ class TestModule(Testing):
         with open(evalLogPath, "a") as f:
             f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {valAcc}\n")
         
+        # TODO: Split pretrain model & load model in testing
         if self.opt["settings"]["model"]["load_weights"] != "":
             pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["load_weights"])
             pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])

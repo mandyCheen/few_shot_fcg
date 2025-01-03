@@ -102,7 +102,7 @@ generate_config() {
         echo "======================================"
     } >> $logFile
     
-
+# TODO: split pretrain & load weight in config
 
     # 創建配置檔案
     cat > $config_file << EOL
@@ -128,7 +128,7 @@ generate_config() {
     },
     "settings": {
         "name": "${expName}_${decisionNetName}_${pretrainName}",
-        "model": {
+        "model": { 
             "model_name": "GraphSAGE",
             "input_size": 128,
             "hidden_size": 128,
@@ -293,9 +293,11 @@ check_experiment_completed() {
     if [ ! -f "$logFile" ]; then
         return 1
     fi
-    
-    # 檢查實驗是否成功完成
-    if grep -A 2 "Experiment Set: $expName.*Decision Network: $decisionNetName.*Pretrain: $pretrainName" "$logFile" | grep -q "Successfully completed the experiment"; then
+
+    if grep -A 5 "Experiment Set: $expName" $logFile | \
+       grep -A 4 "Decision Network: $decisionNetName" | \
+       grep -A 3 "Pretrain: $pretrainName" | \
+       grep -q "Successfully completed the experiment"; then
         return 0
     else
         return 1
