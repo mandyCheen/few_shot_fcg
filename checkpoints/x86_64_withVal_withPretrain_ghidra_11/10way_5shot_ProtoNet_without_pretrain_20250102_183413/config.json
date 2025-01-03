@@ -19,7 +19,7 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "10way_10shot_NnNet_without_pretrain",
+        "name": "10way_5shot_ProtoNet_without_pretrain",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
@@ -49,7 +49,7 @@
             },
             "early_stopping": {
                 "use": true,
-                "patience":  20
+                "patience": 20
             },
             "loss": "CrossEntropyLoss",
             "distance": "euclidean",
@@ -57,15 +57,15 @@
             "save_model": true
         },
         "few_shot": {
-            "method": "NnNet",
+            "method": "ProtoNet",
             "train": {
-                "support_shots": 10,
-                "query_shots": 10,
+                "support_shots": 5,
+                "query_shots": 15,
                 "class_per_iter": 10
             },
             "test": {
-                "support_shots": 10,
-                "query_shots": 10,
+                "support_shots": 5,
+                "query_shots": 15,
                 "class_per_iter": 10
             }
         },
