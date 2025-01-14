@@ -1,6 +1,6 @@
 #!/bin/bash
 
-config_dir="./config"
+config_dir="../config"
 continue=false
 
 # 設定實驗參數陣列
@@ -216,7 +216,7 @@ run_experiment() {
     echo "Pretrain: ${pretrain}"
 
     # 執行 Python 腳本
-    python main.py --config $config_file
+    python ../main.py --config $config_file
     
     # 檢查實驗是否成功
     if [ $? -eq 0 ]; then
@@ -313,7 +313,7 @@ echo "Random Seed: $seed"
 echo "CUDA Device Number: $cuda"
 
 datasetName="${datasetName}_${seed}"
-default_logFile="./logs/log_${datasetName}.txt"
+default_logFile="../logs/log_${datasetName}.txt"
 
 if [ "$continue" = true ]; then
     if [ -f "$default_logFile" ]; then
@@ -339,7 +339,7 @@ for expSet in ${factors["expSet"]}; do
             echo "Experiment Set: $expSet"
             echo "Decision Network: $decisionNet"
             echo "Pretrain: $pretrain"
-
+#TODO: split the test part to another file  
             if check_experiment_completed "$logFile" "$expSet" "$decisionNet" "$pretrain"; then
                 echo "Experiment already completed successfully, skipping..."
                 continue

@@ -53,7 +53,7 @@ echo "Starting evaluation..."
 # 處理每個 config.json
 while IFS= read -r config_file; do
     echo "Processing config: $config_file"
-    if python ./main_eval.py --config "$config_file"; then
+    if python ../main_eval.py --config "$config_file"; then
         ((processed_configs++))
         echo "Successfully processed: $config_file"
     else

@@ -29,7 +29,8 @@ if __name__ == '__main__':
         with open(errorPath, "w") as f:
             f.write(str(e))
         raise
-            
+          
+    #TODO: split the test part to another file  
     testConfigPath = train.model_folder + "/config.json"
 
     Testoptions = load_config(testConfigPath)
