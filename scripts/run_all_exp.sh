@@ -102,8 +102,6 @@ generate_config() {
         echo "======================================"
     } >> $logFile
     
-# TODO: split pretrain & load weight in config
-
     # 創建配置檔案
     cat > $config_file << EOL
 {
@@ -135,7 +133,8 @@ generate_config() {
             "output_size": 128,
             "num_layers": 2,
             "projection": true,
-            "load_weights": "${weight}"
+            "load_weights": "",
+            "pretrained_model_folder": "${weight}"
         },
         "train": {
             "training": true,
@@ -216,13 +215,21 @@ run_experiment() {
     echo "Pretrain: ${pretrain}"
 
     # 執行 Python 腳本
-    python ../main.py --config $config_file
-    
+    python ../RunTraining.py --config $config_file
+
     # 檢查實驗是否成功
     if [ $? -eq 0 ]; then
         echo "Successfully completed the experiment" >> $logFile
     else
         echo "Failed to complete the experiment" >> $logFile
+    fi
+
+    python ../RunEval.py --config $config_file
+
+    if [ $? -eq 0 ]; then
+        echo "Successfully completed the evaluation" >> $logFile
+    else
+        echo "Failed to complete the evaluation" >> $logFile
     fi
 
 }
@@ -339,7 +346,7 @@ for expSet in ${factors["expSet"]}; do
             echo "Experiment Set: $expSet"
             echo "Decision Network: $decisionNet"
             echo "Pretrain: $pretrain"
-#TODO: split the test part to another file  
+
             if check_experiment_completed "$logFile" "$expSet" "$decisionNet" "$pretrain"; then
                 echo "Experiment already completed successfully, skipping..."
                 continue

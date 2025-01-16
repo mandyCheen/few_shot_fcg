@@ -74,15 +74,20 @@ class TrainModule(Training):
         else:
             raise ValueError("Model not supported")
         
-        # TODO split pretrain model & load model in training
-        if(info["load_weights"]):
+        if info["load_weights"]:
+            model_path = os.path.abspath(info["load_weights"])
+            checkpoint = torch.load(model_path, map_location=self.device)
+            self.model.load_state_dict(checkpoint["model_state_dict"], strict=True)
+            print(f"Model loaded from {model_path}")
+            record_log(self.log_file, f"Model loaded from {model_path}\n")
+        elif info["pretrained_model_folder"]:
+            # TODO: warm up the model with pretrained weights
             model_folder = os.path.join(self.pretrain_folder, info["load_weights"])
             model_path = os.path.join(model_folder, [f for f in os.listdir(model_folder) if "best_backbone" in f][0])
             checkpoint = torch.load(model_path, map_location=self.device)
             self.model.load_state_dict(checkpoint["model_state_dict"], strict=False)
             print(f"Model loaded from {model_path}")
-            record_log(self.log_file, f"Model loaded from {model_path}\n")
-            
+            record_log(self.log_file, f"Pretrained model loaded from {model_path}\n")
         
         if torch.cuda.is_available() and self.device == "cpu":
             print("CUDA is available, but you are using CPU")
@@ -309,9 +314,8 @@ class TestModule(Testing):
         with open(evalLogPath, "a") as f:
             f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {valAcc}\n")
         
-        # TODO: Split pretrain model & load model in testing
-        if self.opt["settings"]["model"]["load_weights"] != "":
-            pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["load_weights"])
+        if self.opt["settings"]["model"]["pretrained_model_folder"] != "":
+            pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["pretrained_model_folder"])
             pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
             self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
         else:

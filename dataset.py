@@ -35,7 +35,6 @@ class FcgSampler(Sampler):
             c_idxs = torch.randperm(len(self.classes))[:cpi]
             for i, c in enumerate(self.classes[c_idxs]):
                 s = slice(i * spc, (i + 1) * spc)
-                # FIXME when torch.argwhere will exists
                 label_idx = torch.arange(len(self.classes)).long()[self.classes == c].item()
                 sample_idxs = torch.randperm(self.numel_per_class[label_idx])[:spc]
                 batch[s] = self.indexes[label_idx][sample_idxs]

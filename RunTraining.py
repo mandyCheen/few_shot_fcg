@@ -30,17 +30,3 @@ if __name__ == '__main__':
             f.write(str(e))
         raise
           
-    #TODO: split the test part to another file  
-    testConfigPath = train.model_folder + "/config.json"
-
-    Testoptions = load_config(testConfigPath)
-    
-    testDataset = LoadDataset(Testoptions)
-    testErrorPath = train.model_folder + "/testError.txt"
-    try:
-        test = TestModule(testConfigPath, testDataset)
-        test.eval()
-    except Exception as e:
-        with open(testErrorPath, "w") as f:
-            f.write(str(e))
-        raise
