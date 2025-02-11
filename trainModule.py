@@ -332,7 +332,7 @@ class TestModule(Testing):
             
         print("Finish evaluation")
 
-    def temp_eval(self, model_path: str = None):
+    def temp_eval(self, model_path: str = None): ## Just eval ablation part
         if model_path is None:
             print("Model path is not provided. Using the best model...")
             model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
