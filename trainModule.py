@@ -221,9 +221,9 @@ class TrainModule(Training):
 
             
 class TestModule(Testing):
-    def __init__(self, configPath: str, dataset: LoadDataset):
+    def __init__(self, configPath: str, dataset: LoadDataset, opt: dict = None):
         
-        opt = load_config(configPath)
+        # opt = load_config(configPath)
         self.model_folder = os.path.dirname(configPath)
         self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], dataset.datasetName, opt["settings"]["vectorize"]["node_embedding_method"])
         self.testDataset = dataset.testData
@@ -276,7 +276,7 @@ class TestModule(Testing):
         self.testLoader = DataLoader(testGraph, batch_sampler=sampler, num_workers=4, collate_fn=collate_graphs)    
 
         self.model = GraphSAGE(dim_in=self.opt["settings"]["model"]["input_size"], dim_h=self.opt["settings"]["model"]["hidden_size"], dim_out=self.opt["settings"]["model"]["output_size"], num_layers=self.opt["settings"]["model"]["num_layers"], projection = self.opt["settings"]["model"]["projection"])
-        self.pretrainModel = GraphSAGE(dim_in=self.opt["settings"]["model"]["input_size"], dim_h=self.opt["settings"]["model"]["hidden_size"], dim_out=self.opt["settings"]["model"]["output_size"], num_layers=self.opt["settings"]["model"]["num_layers"], projection = False)
+        self.pretrainModel = GraphSAGE(dim_in=self.opt["settings"]["model"]["input_size"], dim_h=self.opt["settings"]["model"]["hidden_size"], dim_out=self.opt["settings"]["model"]["output_size"], num_layers=self.opt["settings"]["model"]["num_layers"], projection = self.opt["settings"]["model"]["projection"])
         
         self.get_loss_fn()
         
@@ -316,6 +316,39 @@ class TestModule(Testing):
         
         if self.opt["settings"]["model"]["pretrained_model_folder"] != "":
             pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["pretrained_model_folder"])
+            pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
+            self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
+        else:
+            pretrainModelPath = "None"
+        print(f"Ablation evaluation... (testing dataset)")
+        self.pretrainModel = self.pretrainModel.to(self.device)
+        
+        testAccPretrain = self.testing(self.pretrainModel, self.testLoader)
+        print(f"Ablation evaluation... (validation dataset)")
+        valAccPretrain = self.testing(self.pretrainModel, self.valLoader)
+        
+        with open(evalLogPath, "a") as f:
+            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}, {valAccPretrain}\n")
+            
+        print("Finish evaluation")
+
+    def temp_eval(self, model_path: str = None):
+        if model_path is None:
+            print("Model path is not provided. Using the best model...")
+            model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
+            
+
+        evalFolder = os.path.dirname(model_path)
+        logFolder = self.opt["paths"]["model"]["model_folder"] + "/" + self.datasetName
+
+        print("Record evaluation log...")
+        evalLogPath = os.path.join(logFolder, "evalLog.csv")
+        if not os.path.exists(evalLogPath):
+            with open(evalLogPath, "w") as f:
+                f.write("timestamp, folderName, model, test_acc, val_acc\n")
+    
+        if self.opt["settings"]["model"]["load_weights"] != "":
+            pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["load_weights"])
             pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
             self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
         else:

@@ -20,12 +20,10 @@ if __name__ == '__main__':
     options = load_config(configPath)
     
     dataset = LoadDataset(options)
-    
-    test = TestModule(args.config, dataset)
 
     errorPath = os.path.dirname(configPath) + "/testError.txt"
     try:
-        test = TestModule(configPath, dataset)
+        test = TestModule(configPath, dataset, options)
         test.eval()
     except Exception as e:
         with open(errorPath, "w") as f:

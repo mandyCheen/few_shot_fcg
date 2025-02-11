@@ -3,7 +3,7 @@
 # 顯示使用說明
 usage() {
     echo "Usage: $0 --expFolder <experiment_folder>"
-    echo "This script recursively finds all config.json files in subfolders and runs main_eval.py with each config"
+    echo "This script recursively finds all config.json files in subfolders and runs RunEval.py with each config"
     exit 1
 }
 
@@ -24,9 +24,9 @@ if [ ! -d "$exp_folder" ]; then
     exit 1
 fi
 
-# 檢查 main_eval.py 是否存在
-if [ ! -f "./main_eval.py" ]; then
-    echo "Error: main_eval.py not found in current directory"
+# 檢查 RunEval.py 是否存在
+if [ ! -f "../RunEval.py" ]; then
+    echo "Error: ../RunEval.py not found in current directory"
     exit 1
 fi
 
@@ -53,7 +53,7 @@ echo "Starting evaluation..."
 # 處理每個 config.json
 while IFS= read -r config_file; do
     echo "Processing config: $config_file"
-    if python ../main_eval.py --config "$config_file"; then
+    if python ../RunEval.py --config "$config_file"; then
         ((processed_configs++))
         echo "Successfully processed: $config_file"
     else
