@@ -34,6 +34,10 @@ def load_GE_data(dataset: pd.DataFrame, embeddingFolder: str, embeddingSize: int
         le = labelEncoder.LabelEncoder()
         le.fit(labels)
         labels_ = le.transform(labels)
+        folder = os.path.dirname(dataPath)
+        labelDict = dict(zip(le.classes_, le.transform(le.classes_)))
+        with open(f"{folder}/labelDict.pkl", "wb") as f:
+            pickle.dump(labelDict, f)
         for i, data in enumerate(graphList):
             data.y = torch.tensor(labels_[i])
         print(f"Saving data to {dataPath}")
