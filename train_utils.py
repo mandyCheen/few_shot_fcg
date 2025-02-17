@@ -187,7 +187,7 @@ class Training:
                     predicts = self.model(data)
                     if mode == "custom":
                         loss, acc = self.loss_fn(predicts, data.y)
-                    elif mode == "classification_pretrain":
+                    elif mode == "classification_pretrain": # for pretrain
                         loss = self.loss_fn(predicts, data.y)
                         acc = torch.sum(torch.argmax(predicts, dim=1) == data.y) / len(data.y)              
                     loss.backward()

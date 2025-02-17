@@ -92,7 +92,7 @@ class CosineSimilarity(DistanceMetric):
     
 class CrossEntropyLoss(LossFunction):
     @staticmethod
-    def compute(dists, n_classes, n_query):
+    def compute(dists, n_classes, n_query, negative_distance=False):
         """
         使用CrossEntropyLoss計算損失和準確率
         
@@ -104,9 +104,11 @@ class CrossEntropyLoss(LossFunction):
         Returns:
             tuple: (loss_value, accuracy_value)
         """
-        # 注意：不需要手動應用log_softmax，因為CrossEntropyLoss內部會處理
         # 將距離轉換為logits (負距離作為logits)
-        logits = -dists.view(n_classes, n_query, -1)
+        if negative_distance:
+            logits = -dists.view(n_classes, n_query, -1)
+        else:
+            logits = dists.view(n_classes, n_query, -1)
         
         # 準備目標索引
         target_inds = torch.arange(0, n_classes)
@@ -217,9 +219,11 @@ class ProtoLoss(Loss):
         dists = self.distance_metric.compute(query_samples, prototypes)
 
         if self.metric_name == 'cosine_similarity':
-            dists = -dists
-        # 計算損失和準確率
-        return self.loss_fn.compute(dists, n_classes, n_query)
+            # 計算損失和準確率
+            return self.loss_fn.compute(dists, n_classes, n_query)
+        else:
+            # 計算損失和準確率
+            return self.loss_fn.compute(dists, n_classes, n_query, negative_distance=True)
 
     def get_metric_name(self):
         """返回當前使用的距離度量方法名稱"""
@@ -260,22 +264,87 @@ class NnLoss(Loss):
         query_samples = input_cpu[query_idxs]
         
         dists = self.distance_metric.compute(query_samples, nn_points)
-        
-        if self.metric_name == 'cosine_similarity':
-            dists = -dists
 
         # find the nearest neighbor for each query point
         dists_by_class = dists.view(n_classes*n_query, n_classes, self.n_support)
         min_dists, _ = dists_by_class.min(dim=2)
         
-        return self.loss_fn.compute(min_dists, n_classes, n_query)
+        if self.metric_name == 'cosine_similarity':
+            return self.loss_fn.compute(min_dists, n_classes, n_query)
+        else:
+            return self.loss_fn.compute(min_dists, n_classes, n_query, negative_distance=True)
     
     def get_metric_name(self):
         return self.metric_name
     
     def get_loss_fn(self):
         return self.loss_fn_name
+    
+class SoftNnLoss(Loss):
+    def __init__(self, opt: dict):
+        self.metric_name = opt["settings"]["train"]["distance"]
+        self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+        self.loss_fn_name = opt["settings"]["train"]["loss"]
         
+        if self.metric_name not in DISTANCE_METRICS:
+            raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
+                        f"Supported metrics are: {list(DISTANCE_METRICS.keys())}")
+        if self.loss_fn_name not in LOSS_FUNCTIONS:
+            raise ValueError(f"Unsupported loss function: {self.loss_fn_name}. "
+                        f"Supported loss functions are: {list(LOSS_FUNCTIONS.keys())}")
+        
+        self.distance_metric = DISTANCE_METRICS[self.metric_name]
+        self.loss_fn = LOSS_FUNCTIONS[self.loss_fn_name]
+        
+        super().__init__(self.n_support)
+    def __call__(self, input, target):
+        """
+        Compute soft nearest neighbor loss by using weighted distances to all support samples
+        
+        Args:
+            input: Model output features
+            target: Target labels
+            
+        Returns:
+            tuple: (loss_value, accuracy_value)
+        """
+        target_cpu = target.cpu()
+        input_cpu = input.cpu()        
+
+        classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
+        n_classes = len(classes)
+        n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        
+        # Get support points 
+        nn_points = self.get_nn_points(input_cpu, support_idxs)
+        
+        # Get query samples
+        query_samples = input_cpu[query_idxs]
+        
+        # Compute distances between queries and all support samples
+        dists = self.distance_metric.compute(query_samples, nn_points)
+        
+        # Reshape distances to group by class
+        dists_by_class = dists.view(n_classes*n_query, n_classes, self.n_support)
+        
+        # For each query point, compute soft weights for all support samples
+        if self.metric_name == 'cosine_similarity':
+            # For cosine similarity, larger values = more similar
+            weights = F.softmax(dists_by_class, dim=-1)
+            # Weight and sum the raw similarities
+            weighted_dists = (weights * dists_by_class).sum(dim=2)
+        else:
+            # For distance metrics, smaller values = more similar
+            # So we use negative distances for the softmax
+            weights = F.softmax(-dists_by_class, dim=-1) 
+            # Weight and sum the distances
+            weighted_dists = (weights * dists_by_class).sum(dim=2)
+            
+        # Compute loss and accuracy using weighted distances
+        if self.metric_name == 'cosine_similarity':
+            return self.loss_fn.compute(weighted_dists, n_classes, n_query)
+        else:
+            return self.loss_fn.compute(weighted_dists, n_classes, n_query, negative_distance=True)
 class ClassifierLoss(Loss):
     def __init__(self, opt: dict):
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
@@ -305,6 +374,3 @@ class ClassifierLoss(Loss):
         acc = torch.sum(torch.argmax(support_samples, dim=1) == target_cpu[support_idxs]).item() / len(support_idxs)
         
         return loss, acc
-class DCELoss:
-    def __init__(self, opt: dict):
-        super(DCELoss, self).__init__()

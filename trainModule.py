@@ -29,6 +29,9 @@ class TrainModule(Training):
         self.loss_fn = None
         self.opt = opt
         self.datasetName = dataset.datasetName
+        self.folderName = dataset.datasetName
+        if opt["dataset"]["addition_note"]:
+            self.folderName += f"_{opt['dataset']['addition_note']}"
 
         self.support_shots_train = opt["settings"]["few_shot"]["train"]["support_shots"]
         self.query_shots_train = opt["settings"]["few_shot"]["train"]["query_shots"]
@@ -46,7 +49,7 @@ class TrainModule(Training):
         self.parallel_device = opt["settings"]["train"]["parallel_device"]
 
         now = datetime.now()
-        self.model_folder = opt["paths"]["model"]["model_folder"] + "/" + self.datasetName + "/" + opt["settings"]["name"] + "_" + now.strftime("%Y%m%d_%H%M%S")
+        self.model_folder = opt["paths"]["model"]["model_folder"] + "/" + self.folderName + "/" + opt["settings"]["name"] + "_" + now.strftime("%Y%m%d_%H%M%S")
         self.pretrain_folder = opt["paths"]["model"]["pretrained_folder"]
         os.makedirs(self.model_folder, exist_ok=True)
         self.log_file = self.model_folder + "/log.txt"
@@ -82,7 +85,7 @@ class TrainModule(Training):
             record_log(self.log_file, f"Model loaded from {model_path}\n")
         elif info["pretrained_model_folder"]:
             # TODO: warm up the model with pretrained weights
-            model_folder = os.path.join(self.pretrain_folder, info["load_weights"])
+            model_folder = os.path.join(self.pretrain_folder, info["pretrained_model_folder"])
             model_path = os.path.join(model_folder, [f for f in os.listdir(model_folder) if "best_backbone" in f][0])
             checkpoint = torch.load(model_path, map_location=self.device)
             self.model.load_state_dict(checkpoint["model_state_dict"], strict=False)
@@ -109,6 +112,8 @@ class TrainModule(Training):
             loss_fn = ProtoLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "NnNet":
             loss_fn = NnLoss(self.opt)
+        elif self.opt["settings"]["few_shot"]["method"] == "SoftNnNet":
+            loss_fn = SoftNnLoss(self.opt)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -208,7 +213,7 @@ class TrainModule(Training):
         splitFiles = [f for f in os.listdir(splitFolder) if f.endswith(f"{self.datasetName}.txt")]
         for f in splitFiles:
             src = os.path.join(splitFolder, f)
-            dst = os.path.join(self.opt["paths"]["model"]["model_folder"] + "/" + self.datasetName, f)
+            dst = os.path.join(os.path.dirname(self.model_folder), f)
             if not os.path.exists(dst):
                 os.system(f"cp {src} {dst}")
         print("Finish copying split files")
@@ -228,7 +233,6 @@ class TestModule(Testing):
         self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], dataset.datasetName, opt["settings"]["vectorize"]["node_embedding_method"])
         self.testDataset = dataset.testData
         self.valDataset = dataset.valData
-        self.datasetName = dataset.datasetName
         self.testGraph = []
         self.loss_fn = None
         self.opt = opt
@@ -290,13 +294,13 @@ class TestModule(Testing):
             model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
             
         evalFolder = os.path.dirname(model_path)
-        logFolder = self.opt["paths"]["model"]["model_folder"] + "/" + self.datasetName
+        logFolder = os.path.dirname(self.model_folder)
 
         print("Record evaluation log...")
         evalLogPath = os.path.join(logFolder, "evalLog.csv")
         if not os.path.exists(evalLogPath):
             with open(evalLogPath, "w") as f:
-                f.write("timestamp, folderName, model, test_acc, val_acc\n")
+                f.write("timestamp, folderName, model, test_acc\n")
     
         print(f"Loading model from {model_path}")
 
@@ -308,38 +312,38 @@ class TestModule(Testing):
         print("Start evaluation... (testing dataset)")
         testAcc = self.testing(self.model, self.testLoader)
 
-        print("Start evaluation... (validation dataset)")
-        valAcc = self.testing(self.model, self.valLoader)
+        # print("Start evaluation... (validation dataset)")
+        # valAcc = self.testing(self.model, self.valLoader)
 
         with open(evalLogPath, "a") as f:
-            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {valAcc}\n")
+            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}\n")
         
-        if self.opt["settings"]["model"]["pretrained_model_folder"] != "":
-            pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["pretrained_model_folder"])
-            pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
-            self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
-        else:
-            pretrainModelPath = "None"
-        print(f"Ablation evaluation... (testing dataset)")
-        self.pretrainModel = self.pretrainModel.to(self.device)
+        # if self.opt["settings"]["model"]["pretrained_model_folder"] != "":
+        #     pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["pretrained_model_folder"])
+        #     pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
+        #     self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
+        # else:
+        #     pretrainModelPath = "None"
+        # print(f"Ablation evaluation... (testing dataset)")
+        # self.pretrainModel = self.pretrainModel.to(self.device)
         
-        testAccPretrain = self.testing(self.pretrainModel, self.testLoader)
-        print(f"Ablation evaluation... (validation dataset)")
-        valAccPretrain = self.testing(self.pretrainModel, self.valLoader)
+        # testAccPretrain = self.testing(self.pretrainModel, self.testLoader)
+        # print(f"Ablation evaluation... (validation dataset)")
+        # valAccPretrain = self.testing(self.pretrainModel, self.valLoader)
         
-        with open(evalLogPath, "a") as f:
-            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}, {valAccPretrain}\n")
+        # with open(evalLogPath, "a") as f:
+        #     f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}, {valAccPretrain}\n")
             
         print("Finish evaluation")
 
-    def temp_eval(self, model_path: str = None): ## Just eval ablation part
+    def eval_ablation(self, model_path: str = None): ## Just eval ablation part
         if model_path is None:
             print("Model path is not provided. Using the best model...")
             model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
             
 
         evalFolder = os.path.dirname(model_path)
-        logFolder = self.opt["paths"]["model"]["model_folder"] + "/" + self.datasetName
+        logFolder = os.path.dirname(self.model_folder)
 
         print("Record evaluation log...")
         evalLogPath = os.path.join(logFolder, "evalLog.csv")
@@ -357,10 +361,10 @@ class TestModule(Testing):
         self.pretrainModel = self.pretrainModel.to(self.device)
         
         testAccPretrain = self.testing(self.pretrainModel, self.testLoader)
-        print(f"Ablation evaluation... (validation dataset)")
-        valAccPretrain = self.testing(self.pretrainModel, self.valLoader)
+        # print(f"Ablation evaluation... (validation dataset)")
+        # valAccPretrain = self.testing(self.pretrainModel, self.valLoader)
         
         with open(evalLogPath, "a") as f:
-            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}, {valAccPretrain}\n")
+            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}\n")
             
         print("Finish evaluation")

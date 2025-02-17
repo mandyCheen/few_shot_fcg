@@ -116,7 +116,8 @@ generate_config() {
             "ngioweb",
             "mirai",
             "tsunami"
-        ]
+        ],
+        "addition_note": "testing_for_cosine"
     },
     "pretrain": {
         "name": "x86_pretrained",
