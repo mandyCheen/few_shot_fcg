@@ -76,26 +76,7 @@ class Training:
         self.train_acc_history = []
         self.val_acc_history = []
 
-    def plot_accuracy(self):
-        import matplotlib.pyplot as plt
-        
-        plt.figure(figsize=(10, 6))
-        plt.plot(self.iterations, self.train_acc_history, 'b-', label='Training Accuracy')
-        if self.valLoader is not None:
-            plt.plot(self.iterations, self.val_acc_history, 'r-', label='Validation Accuracy')
-        
-        
-        plt.xlabel('Iteration')
-        plt.ylabel('Accuracy')
-        plt.title('Training and Validation Accuracy over Iterations')
-        plt.legend()
-        plt.grid(True)
-        
-        # 保存圖片
-        plt.savefig(f'{self.model_folder}/accuracy_plot.png')
-        plt.close()
-
-    def end_of_epoch(self, avg_acc, best_acc, epoch, patience, save_backbone, avg_loss):
+    def end_of_epoch(self, avg_acc, best_acc, epoch, patience, avg_loss):
         if self.scheduler:
             if self.opt["settings"]["train"]["lr_scheduler"]["method"] == "ReduceLROnPlateau":
                 self.scheduler.step(avg_loss)
@@ -107,28 +88,23 @@ class Training:
             if self.save_model:
                 self.best_model = self.model
                 save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder)
-            if save_backbone:
-                save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder, backbone=True)
             if self.early_stopping:
                 patience = 0
         else:
             if self.save_model and (epoch+1) % 10 == 0:
                 save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder)
-            if save_backbone and (epoch+1) % 10 == 0:
-                save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, backbone=True)
             if self.early_stopping:
                 patience += 1
                 if patience == self.early_stopping_patience:
                     print("Early stopping")
                     record_log(self.log_file, "Early stopping in epoch {}\n".format(epoch+1))
-                    
                     return best_acc, patience, True
         if self.early_stopping:
             print(f"Patience: {patience}/{self.early_stopping_patience}")
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
         return best_acc, patience, False
 
-    def end_of_epoch_loss(self, avg_loss, lowest_loss, epoch, patience, save_backbone):
+    def end_of_epoch_loss(self, avg_loss, lowest_loss, epoch, patience):
         if self.scheduler:
             if self.opt["settings"]["train"]["lr_scheduler"]["method"] == "ReduceLROnPlateau":
                 self.scheduler.step(avg_loss)
@@ -139,28 +115,53 @@ class Training:
             if self.save_model:
                 self.best_model = self.model
                 save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder)
-            if save_backbone:
+            if self.early_stopping:
+                patience = 0
+        else:
+            if self.save_model and (epoch+1) % 10 == 0:
+                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder)
+            if self.early_stopping:
+                patience += 1
+                if patience == self.early_stopping_patience:
+                    print("Early stopping")
+                    record_log(self.log_file, "Early stopping in epoch {}\n".format(epoch+1))
+                    return lowest_loss, patience, True
+        if self.early_stopping:
+            print(f"Patience: {patience}/{self.early_stopping_patience}")
+            record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
+        return lowest_loss, patience, False
+    
+    def end_of_epoch_pretrain(self, avg_acc, best_acc, epoch, patience, avg_loss):
+        if self.scheduler:
+            if self.opt["settings"]["train"]["lr_scheduler"]["method"] == "ReduceLROnPlateau":
+                self.scheduler.step(avg_loss)
+            elif self.opt["settings"]["train"]["lr_scheduler"]["method"] == "StepLR":
+                self.scheduler.step()
+            print(f"Current learning rate: {self.scheduler.get_last_lr()}")
+        if avg_acc >= best_acc:
+            best_acc = avg_acc
+            if self.save_model:
+                self.best_model = self.model
+                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder)
                 save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder, backbone=True)
             if self.early_stopping:
                 patience = 0
         else:
             if self.save_model and (epoch+1) % 10 == 0:
                 save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder)
-            if save_backbone and (epoch+1) % 10 == 0:
                 save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, backbone=True)
             if self.early_stopping:
                 patience += 1
                 if patience == self.early_stopping_patience:
                     print("Early stopping")
                     record_log(self.log_file, "Early stopping in epoch {}\n".format(epoch+1))
-                    
-                    return lowest_loss, patience, True
+                    return best_acc, patience, True
         if self.early_stopping:
             print(f"Patience: {patience}/{self.early_stopping_patience}")
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
-        return lowest_loss, patience, False
+        return best_acc, patience, False   
 
-    def run(self, backbone=False, mode = "custom"):
+    def run(self):
         train_loss = []
         train_acc = []
         val_loss = []
@@ -171,25 +172,18 @@ class Training:
         lowest_val_loss = 1000
         patience = 0
         stop = False
-        
         # save config
         save_config(self.opt, self.model_folder + "/config.json")
         # save model architecture
         save_model_architecture(self.model, self.model_folder + "/model_architecture.txt")
-
         for epoch in range(self.epochs):
             self.model.train()
-
             with tqdm(self.trainLoader, desc=f"Epoch {epoch+1}/{self.epochs} (Training)") as pbar:
                 for data in pbar:
                     self.optim.zero_grad()
                     data = data.to(self.device)
                     predicts = self.model(data)
-                    if mode == "custom":
-                        loss, acc = self.loss_fn(predicts, data.y)
-                    elif mode == "classification_pretrain": # for pretrain
-                        loss = self.loss_fn(predicts, data.y)
-                        acc = torch.sum(torch.argmax(predicts, dim=1) == data.y) / len(data.y)              
+                    loss, acc = self.loss_fn(predicts, data.y)        
                     loss.backward()
                     self.optim.step()   
                     
@@ -199,7 +193,6 @@ class Training:
                         'loss': f'{loss.item():.4f}',
                         'acc': f'{acc.item():.4f}',
                     })
-
                     train_loss.append(loss.item())
                     train_acc.append(acc.item()) 
 
@@ -223,11 +216,7 @@ class Training:
                         data = data.to(self.device)
                         with torch.no_grad():
                             model_output = self.model(data)
-                            if mode == "custom":
-                                loss, acc = self.loss_fn(model_output, data.y)
-                            elif mode == "classification_pretrain":
-                                loss= self.loss_fn(model_output, data.y)
-                                acc = torch.sum(torch.argmax(model_output, dim=1) == data.y) / len(data.y)
+                            loss, acc = self.loss_fn(model_output, data.y)
                         val_loss.append(loss.item())
                         val_acc.append(acc.item())
                         self.val_acc_history.append(acc.item())
@@ -244,14 +233,96 @@ class Training:
                     # content = f'Avg Val Loss: {avg_loss:.4f}{postfix}, Avg Val Acc: {avg_acc:.4f}'
                     print(content)
                     record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
-                    best_val_acc, patience, stop = self.end_of_epoch(avg_acc, best_val_acc, epoch, patience, backbone, avg_loss)
+                    best_val_acc, patience, stop = self.end_of_epoch(avg_acc, best_val_acc, epoch, patience, avg_loss)
+                    # lowest_val_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_val_loss, epoch, patience)
+            else:
+                best_train_acc, patience, stop = self.end_of_epoch(avg_acc, best_train_acc, epoch, patience, avg_loss)
+                # lowest_train_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_train_loss, epoch, patience)
+            if stop:
+                break
+        return True
+    
+    def run_pretrain(self):
+        train_loss = []
+        train_acc = []
+        val_loss = []
+        val_acc = []
+        best_train_acc = 0
+        best_val_acc = 0
+        lowest_train_loss = 1000
+        lowest_val_loss = 1000
+        patience = 0
+        stop = False
+        # save config
+        save_config(self.opt, self.model_folder + "/config.json")
+        # save model architecture
+        save_model_architecture(self.model, self.model_folder + "/model_architecture.txt")
+
+        for epoch in range(self.epochs):
+            self.model.train()
+            with tqdm(self.trainLoader, desc=f"Epoch {epoch+1}/{self.epochs} (Training)") as pbar:
+                for data in pbar:
+                    self.optim.zero_grad()
+                    data = data.to(self.device)
+                    predicts = self.model(data)
+                    loss = self.loss_fn(predicts, data.y)
+                    acc = torch.sum(torch.argmax(predicts, dim=1) == data.y) / len(data.y)              
+                    loss.backward()
+                    self.optim.step()   
+                    
+                    self.train_acc_history.append(acc.item())
+                    # Update progress bar with current batch metrics
+                    pbar.set_postfix({
+                        'loss': f'{loss.item():.4f}',
+                        'acc': f'{acc.item():.4f}',
+                    })
+                    train_loss.append(loss.item())
+                    train_acc.append(acc.item()) 
+                avg_loss = np.mean(train_loss)
+                avg_acc = np.mean(train_acc)
+                postfix = ' (Best)' if avg_acc >= best_train_acc else f' (Best: {best_train_acc:.4f})'
+                # postfix = ' (Lowest)' if avg_loss <= lowest_train_loss else f' (Lowest: {lowest_train_loss:.4f})'
+                content = f'Avg Train Loss: {avg_loss:.4f}, Avg Train Acc: {avg_acc:.4f}{postfix}'
+                # content = f'Avg Train Loss: {avg_loss:.4f}{postfix}, Avg Train Acc: {avg_acc:.4f}'
+                if self.valLoader is not None and avg_acc >= best_train_acc:
+                    best_train_acc = avg_acc
+                # if self.valLoader is not None and avg_loss <= lowest_train_loss:
+                #     lowest_train_loss = avg_loss
+                print(content)
+                record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
+
+            if self.valLoader is not None: 
+                self.model.eval()                
+                with tqdm(self.valLoader, desc=f"Epoch {epoch+1}/{self.epochs} (Validation)") as pbar:
+                    for data in pbar:
+                        data = data.to(self.device)
+                        with torch.no_grad():
+                            model_output = self.model(data)
+                        loss= self.loss_fn(model_output, data.y)
+                        acc = torch.sum(torch.argmax(model_output, dim=1) == data.y) / len(data.y)
+                        val_loss.append(loss.item())
+                        val_acc.append(acc.item())
+                        self.val_acc_history.append(acc.item())
+                        # Update progress bar with current batch metrics
+                        pbar.set_postfix({
+                            'loss': f'{loss.item():.4f}',
+                            'acc': f'{acc.item():.4f}',
+                        })
+                    avg_loss = np.mean(val_loss)
+                    avg_acc = np.mean(val_acc)
+                    postfix = ' (Best)' if avg_acc >= best_val_acc else f' (Best: {best_val_acc:.4f})'
+                    # postfix = ' (Lowest)' if avg_loss <= lowest_val_loss else f' (Lowest: {lowest_val_loss:.4f})'
+                    content = f'Avg Val Loss: {avg_loss:.4f}, Avg Val Acc: {avg_acc:.4f}{postfix}'
+                    # content = f'Avg Val Loss: {avg_loss:.4f}{postfix}, Avg Val Acc: {avg_acc:.4f}'
+                    print(content)
+                    record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
+                    best_val_acc, patience, stop = self.end_of_epoch_pretrain(avg_acc, best_val_acc, epoch, patience, avg_loss)
                     # lowest_val_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_val_loss, epoch, patience, backbone)
             else:
-                best_train_acc, patience, stop = self.end_of_epoch(avg_acc, best_train_acc, epoch, patience, backbone, avg_loss)
+                best_train_acc, patience, stop = self.end_of_epoch_pretrain(avg_acc, best_train_acc, epoch, patience, avg_loss)
                 # lowest_train_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_train_loss, epoch, patience, backbone)
             if stop:
                 break
-        # self.plot_accuracy()
         return True
 
 class Testing:

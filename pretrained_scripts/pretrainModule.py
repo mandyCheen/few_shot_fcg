@@ -2,17 +2,16 @@
 import torch
 import torch.nn as nn
 from torch_geometric.loader import DataLoader 
-from loadDataset import LoadDataset
+from loadDatasetPretrained import LoadDatasetPretrained
 from datetime import datetime
 import torch.nn.functional as F
 import os
 from tqdm import tqdm
 from train_utils import Training, load_GE_data
-from loadDataset import LoadDataset
 from models import GraphClassifier
 
 class PretrainModule(Training):
-    def __init__(self, opt: dict, dataset: LoadDataset):
+    def __init__(self, opt: dict, dataset: LoadDatasetPretrained):
         self.opt = opt
         self.device = opt["settings"]["train"]["device"]
         self.device = torch.device(self.device)
@@ -120,7 +119,6 @@ class PretrainModule(Training):
         self.model = model
 
     def train(self):
-        training = Training(self.opt, self.train_loader, self.val_loader, self.model, self.criterion, self.optimizer, self.scheduler, self.device, self.model_folder)
         print("Start training...")
-        self.run(backbone=True, mode="classification_pretrain")
+        self.run_pretrain()
         print("Finish training...")

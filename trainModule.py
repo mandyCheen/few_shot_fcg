@@ -77,13 +77,7 @@ class TrainModule(Training):
         else:
             raise ValueError("Model not supported")
         
-        if info["load_weights"]:
-            model_path = os.path.abspath(info["load_weights"])
-            checkpoint = torch.load(model_path, map_location=self.device)
-            self.model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-            print(f"Model loaded from {model_path}")
-            record_log(self.log_file, f"Model loaded from {model_path}\n")
-        elif info["pretrained_model_folder"]:
+        if info["pretrained_model_folder"]:
             # TODO: warm up the model with pretrained weights
             model_folder = os.path.join(self.pretrain_folder, info["pretrained_model_folder"])
             model_path = os.path.join(model_folder, [f for f in os.listdir(model_folder) if "best_backbone" in f][0])
@@ -192,18 +186,28 @@ class TrainModule(Training):
             self.valLoader = None
 
         self.get_backbone()
-        print(f"Model: {self.model}")
-        record_log(self.log_file, f"Model: {self.model}\n")
         self.get_loss_fn()
-        print(f"Loss function: {self.loss_fn}")
-        record_log(self.log_file, f"Loss function: {self.loss_fn}\n")
         self.get_optimizer()
-        print(f"Optimizer: {self.optim}") 
-        record_log(self.log_file, f"Optimizer: {self.optim}\n")
         if self.lr_scheduler:
             self.get_lr_scheduler()
-            
+
+        info = self.opt["settings"]["model"]
+        if info["load_weights"]:
+            model_path = os.path.abspath(info["load_weights"])
+            checkpoint = torch.load(model_path, map_location=self.device)
+            self.model.load_state_dict(checkpoint["model_state_dict"], strict=True)
+            self.optim.load_state_dict(checkpoint["optimizer_state_dict"])
+            if self.scheduler:
+                self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+            print(f"Model loaded from {model_path}")
+            record_log(self.log_file, f"Model loaded from {model_path}\n")
         
+        print(f"Model: {self.model}")
+        record_log(self.log_file, f"Model: {self.model}\n")
+        print(f"Loss function: {self.loss_fn}")
+        record_log(self.log_file, f"Loss function: {self.loss_fn}\n")
+        print(f"Optimizer: {self.optim}") 
+        record_log(self.log_file, f"Optimizer: {self.optim}\n")
         print("Finish setting up the training module")
 
     def train(self):
@@ -258,6 +262,8 @@ class TestModule(Testing):
             loss_fn = ProtoLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "NnNet":
             loss_fn = NnLoss(self.opt)
+        elif self.opt["settings"]["few_shot"]["method"] == "SoftNnNet":
+            loss_fn = SoftNnLoss(self.opt)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
