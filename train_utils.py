@@ -172,6 +172,7 @@ class Training:
         lowest_val_loss = 1000
         patience = 0
         stop = False
+        print(f"Current learning rate: {self.scheduler.get_last_lr()}")
         # save config
         save_config(self.opt, self.model_folder + "/config.json")
         # save model architecture
