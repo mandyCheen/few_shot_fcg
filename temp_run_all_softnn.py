@@ -11,13 +11,10 @@ options = load_config("./config/config.json")
 warnings.filterwarnings("ignore")
 
 expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
-seeds = [6, 7, 10, 11, 19, 22, 31, 42, 666, 888]
+seeds = [19, 22, 31, 42, 888]
 
 for seed in seeds:
     for exp in expList:
-        if seed == 6 and exp == "5way_5shot":
-            continue
-
         options["settings"]["name"] = exp+"_SoftNnNet"
         shots = int(exp.split("_")[1].split("shot")[0])
         way = int(exp.split("_")[0].split("way")[0])
@@ -29,7 +26,6 @@ for seed in seeds:
         options["settings"]["few_shot"]["test"]["class_per_iter"] = way
         options["settings"]["seed"] = seed
         save_config(options, "./config/config.json")
-
 
         dataset = LoadDataset(options, pretrain=False)
         vectorizer = FCGVectorize(options, dataset)

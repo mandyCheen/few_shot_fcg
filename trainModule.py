@@ -200,6 +200,7 @@ class TrainModule(Training):
             if self.scheduler:
                 self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
             print(f"Model loaded from {model_path}")
+            self.model.train()
             record_log(self.log_file, f"Model loaded from {model_path}\n")
         
         print(f"Model: {self.model}")
@@ -211,7 +212,6 @@ class TrainModule(Training):
         print("Finish setting up the training module")
 
     def train(self):
-
         print("Copying split files...")
         splitFolder = self.opt["paths"]["data"]["split_folder"]
         splitFiles = [f for f in os.listdir(splitFolder) if f.endswith(f"{self.datasetName}.txt")]
