@@ -9,7 +9,7 @@ from plot_utils import *
 
 SEED = 7
 
-def plot_rho_delta(rho, delta, family = None):
+def plot_rho_delta(rho, delta, datasetName = None):
 	'''
 	Plot scatter diagram for rho-delta points
 
@@ -18,11 +18,11 @@ def plot_rho_delta(rho, delta, family = None):
 		delta : delta list
 	'''
 	logger.info("PLOT: rho-delta plot")
-	plot_scatter_diagram(0, rho[1:], delta[1:], x_label='rho', y_label='delta', title=f'Decision Graph {family}', )
+	plot_scatter_diagram(0, rho[1:], delta[1:], x_label='rho', y_label='delta', title=f'Decision Graph {datasetName}', )
 	# plt.savefig('Decision Graph.jpg')
 
 
-def plot_cluster(cluster, family = None):
+def plot_cluster(cluster, datasetName = None):
 	'''
 	Plot scatter diagram for final points that using multi-dimensional scaling for data
 
@@ -39,18 +39,18 @@ def plot_cluster(cluster, family = None):
 		cls.append(cluster.cluster[i])
 	cls.append(cluster.cluster[cluster.max_id])
 	cls = np.array(cls, dtype = np.float32)
-	fo = open(f'./cluster_result/{family}_cluster.txt', 'w')
+	fo = open(f'./cluster_result/{datasetName}_cluster.txt', 'w')
 	fo.write('\n'.join(map(str, cls)))
 	fo.close()
 	#seed = np.random.RandomState(seed=3)
 	mds = manifold.MDS(max_iter=200, eps=1e-4, n_init=1,dissimilarity='precomputed', random_state=SEED)
 	dp_mds = mds.fit_transform(dp.astype(np.float64))
 	logger.info("PLOT: end mds, start plot")
-	plot_scatter_diagram(1, dp_mds[:, 0], dp_mds[:, 1], title=f'2D Nonclassical Multidimensional Scaling {family}', style_list = cls)
+	plot_scatter_diagram(1, dp_mds[:, 0], dp_mds[:, 1], title=f'2D Nonclassical Multidimensional Scaling {datasetName}', style_list = cls)
 	# plt.savefig("2D Nonclassical Multidimensional Scaling.jpg")
 
 
-def plot_rhodelta_rho(rho, delta, family = None):
+def plot_rhodelta_rho(rho, delta, datasetName = None):
 	'''
 	Plot scatter diagram for rho*delta_rho points
 
@@ -72,7 +72,7 @@ def plot_rhodelta_rho(rho, delta, family = None):
 	plt.xlabel('sorted rho')
 	plt.ylabel('rho*delta')
 	plt.title("Decision Graph RhoDelta-Rho")
-	plt.savefig(f'./pic/Decision Graph RhoDelta-Rho {family}.jpg', dpi=300)
+	plt.savefig(f'./cluster_pic/Decision Graph RhoDelta-Rho {datasetName}.jpg', dpi=300)
 	plt.show()
 	# plt.savefig('Decision Graph RhoDelta-Rho.jpg')
 

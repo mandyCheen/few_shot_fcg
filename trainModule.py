@@ -5,7 +5,7 @@ import torch
 from torch_geometric.data import Data, Batch
 from loadDataset import LoadDataset
 from dataset import FcgSampler
-from models import GraphSAGE, GCN
+from models import GraphSAGE, GCN, GraphSAGELayer
 from torch_geometric.loader import DataLoader # !
 from loss import *
 from datetime import datetime
@@ -71,7 +71,10 @@ class TrainModule(Training):
     def get_backbone(self):
         info = self.opt["settings"]["model"]
         if info["model_name"] == "GraphSAGE":
-            self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                self.model = GraphSAGELayer(dim_in=info["input_size"], dim_h=info["hidden_size"], num_layers=info["num_layers"])
+            else:
+                self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
         elif info["model_name"] == "GCN":
             self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
         else:
@@ -108,6 +111,8 @@ class TrainModule(Training):
             loss_fn = NnLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "SoftNnNet":
             loss_fn = SoftNnLoss(self.opt)
+        elif self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+            loss_fn = LabelPropagation(self.opt)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -221,7 +226,7 @@ class TrainModule(Training):
             if not os.path.exists(dst):
                 os.system(f"cp {src} {dst}")
         print("Finish copying split files")
-        
+    
         print("Start training...")
         record_log(self.log_file, "Start training...\n")
         self.run()
@@ -346,7 +351,6 @@ class TestModule(Testing):
         if model_path is None:
             print("Model path is not provided. Using the best model...")
             model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
-            
 
         evalFolder = os.path.dirname(model_path)
         logFolder = os.path.dirname(self.model_folder)

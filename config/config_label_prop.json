@@ -20,14 +20,14 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "10way_1shot_NnNet",
+        "name": "5way_5shot_LabelPropagation",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
             "hidden_size": 128,
             "output_size": 128,
             "num_layers": 2,
-            "projection": true,
+            "projection": false,
             "load_weights": "",
             "pretrained_model_folder": "x86_pretrained_20241121_1653"
         },
@@ -39,8 +39,8 @@
             "parallel": false,
             "parallel_device": [],
             "iterations": 100,
-            "lr": 0.003,
-            "projection_lr": 0.003,
+            "lr": 0.001,
+            "projection_lr": 0.001,
             "lr_scheduler": {
                 "use": true,
                 "method": "ReduceLROnPlateau",
@@ -54,21 +54,26 @@
                 "patience": 20
             },
             "loss": "CrossEntropyLoss",
-            "distance": "cosine_similarity",
+            "distance": "",
             "optimizer": "Adam",
             "save_model": true
         },
         "few_shot": {
-            "method": "NnNet",
+            "method": "LabelPropagation",
             "train": {
-                "support_shots": 1,
-                "query_shots": 19,
-                "class_per_iter": 10
+                "support_shots": 5,
+                "query_shots": 15,
+                "class_per_iter": 5
             },
             "test": {
-                "support_shots": 1,
-                "query_shots": 19,
-                "class_per_iter": 10
+                "support_shots": 5,
+                "query_shots": 15,
+                "class_per_iter": 5
+            },
+            "parameters":{
+                "rn": 300,
+                "alpha": 0.6,
+                "k": 10
             }
         },
         "vectorize": {
@@ -76,7 +81,7 @@
             "node_embedding_size": 128,
             "num_workers": 4
         },
-        "seed": 19
+        "seed": 6
     },
     "paths": {
         "data": {

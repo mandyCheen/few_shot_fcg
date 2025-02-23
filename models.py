@@ -200,3 +200,50 @@ class GraphClassifier(torch.nn.Module):
     def get_embeddings(self, data):
         h = self.backbone(data)
         return h
+    
+class GraphSAGELayer(nn.Module):
+    """使用PyTorch Geometric的GraphSAGE層"""
+    def __init__(self, dim_in: int, dim_h: int, num_layers: int):
+        super().__init__()
+        self.num_layers = num_layers
+        
+        # GNN layers
+        self.sage_convs = torch.nn.ModuleList()
+        self.norms = torch.nn.ModuleList()
+        
+        # First layer
+        self.sage_convs.append(SAGEConv(dim_in, dim_h))
+        self.norms.append(BatchNorm1d(dim_h))
+        
+        # Additional layers
+        for _ in range(num_layers - 1):
+            self.sage_convs.append(SAGEConv(dim_h, dim_h))
+            self.norms.append(BatchNorm1d(dim_h))
+
+    def forward(self, x, edge_index):
+        device = x.device
+        edge_index = edge_index.to(device)
+        
+        h = x
+        for i in range(self.num_layers):
+            h = self.sage_convs[i](h, edge_index)
+            h = self.norms[i](h)
+            h = F.relu(h)
+
+        return h
+
+class GraphRelationNetwork(nn.Module):
+    """基於GraphSAGE的關係網絡"""
+    def __init__(self, input_dim, hidden_dim):
+        super(GraphRelationNetwork, self).__init__()
+        self.sage = GraphSAGELayer(input_dim, hidden_dim, num_layers=1)
+        self.fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 2, 1)
+        )
+
+    def forward(self, x, edge_index, batch):
+        h = self.sage(x, edge_index)
+        h = global_mean_pool(h, batch)
+        return self.fc(h)

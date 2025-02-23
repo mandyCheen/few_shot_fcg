@@ -10,12 +10,12 @@ import os
 options = load_config("./config/config.json")
 warnings.filterwarnings("ignore")
 
-expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
+expList = ["5way_1shot", "10way_1shot"]
 seeds = [19, 22, 31, 42, 888]
-
+## always with pretrain
 for seed in seeds:
     for exp in expList:
-        options["settings"]["name"] = exp+"_SoftNnNet"
+        options["settings"]["name"] = exp+"_NnNet"
         shots = int(exp.split("_")[1].split("shot")[0])
         way = int(exp.split("_")[0].split("way")[0])
         options["settings"]["few_shot"]["train"]["support_shots"] = shots
@@ -35,3 +35,4 @@ for seed in seeds:
 
         test = TestModule(os.path.join(trainModule.model_folder, "config.json"), dataset, options)
         test.eval()
+        test.eval_ablation()

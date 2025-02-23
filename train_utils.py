@@ -181,10 +181,15 @@ class Training:
             self.model.train()
             with tqdm(self.trainLoader, desc=f"Epoch {epoch+1}/{self.epochs} (Training)") as pbar:
                 for data in pbar:
-                    self.optim.zero_grad()
                     data = data.to(self.device)
-                    predicts = self.model(data)
-                    loss, acc = self.loss_fn(predicts, data.y)        
+                    self.optim.zero_grad()
+                    if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                        self.loss_fn.train()
+                        emb = self.model(data.x, data.edge_index)
+                        loss, acc = self.loss_fn(emb, data.y, data.edge_index, data.batch)
+                    else:
+                        predicts = self.model(data)
+                        loss, acc = self.loss_fn(predicts, data.y)        
                     loss.backward()
                     self.optim.step()   
                     
@@ -196,7 +201,6 @@ class Training:
                     })
                     train_loss.append(loss.item())
                     train_acc.append(acc.item()) 
-
                 avg_loss = np.mean(train_loss)
                 avg_acc = np.mean(train_acc)
                 postfix = ' (Best)' if avg_acc >= best_train_acc else f' (Best: {best_train_acc:.4f})'
@@ -216,8 +220,13 @@ class Training:
                     for data in pbar:
                         data = data.to(self.device)
                         with torch.no_grad():
-                            model_output = self.model(data)
-                            loss, acc = self.loss_fn(model_output, data.y)
+                            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                                self.loss_fn.eval()
+                                emb = self.model(data.x, data.edge_index)
+                                loss, acc = self.loss_fn(emb, data.y, data.edge_index, data.batch)
+                            else:
+                                model_output = self.model(data)
+                                loss, acc = self.loss_fn(model_output, data.y)
                         val_loss.append(loss.item())
                         val_acc.append(acc.item())
                         self.val_acc_history.append(acc.item())
