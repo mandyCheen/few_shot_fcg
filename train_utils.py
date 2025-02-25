@@ -91,14 +91,14 @@ class Training:
             if self.early_stopping:
                 patience = 0
         else:
-            if self.save_model and (epoch+1) % 10 == 0:
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_acc)
             if self.early_stopping:
                 patience += 1
                 if patience == self.early_stopping_patience:
                     print("Early stopping")
                     record_log(self.log_file, "Early stopping in epoch {}\n".format(epoch+1))
                     return best_acc, patience, True
+        if self.save_model and (epoch+1) % 10 == 0:
+            save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_acc)
         if self.early_stopping:
             print(f"Patience: {patience}/{self.early_stopping_patience}")
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
@@ -118,14 +118,14 @@ class Training:
             if self.early_stopping:
                 patience = 0
         else:
-            if self.save_model and (epoch+1) % 10 == 0:
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_loss)
             if self.early_stopping:
                 patience += 1
                 if patience == self.early_stopping_patience:
                     print("Early stopping")
                     record_log(self.log_file, "Early stopping in epoch {}\n".format(epoch+1))
                     return lowest_loss, patience, True
+        if self.save_model and (epoch+1) % 10 == 0:
+            save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_loss)
         if self.early_stopping:
             print(f"Patience: {patience}/{self.early_stopping_patience}")
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
@@ -147,25 +147,21 @@ class Training:
             if self.early_stopping:
                 patience = 0
         else:
-            if self.save_model and (epoch+1) % 10 == 0:
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_acc)
-                save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, backbone=True, value=avg_acc)
             if self.early_stopping:
                 patience += 1
                 if patience == self.early_stopping_patience:
                     print("Early stopping")
                     record_log(self.log_file, "Early stopping in epoch {}\n".format(epoch+1))
                     return best_acc, patience, True
+        if self.save_model and (epoch+1) % 10 == 0:
+            save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_acc)
+            save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, backbone=True, value=avg_acc)
         if self.early_stopping:
             print(f"Patience: {patience}/{self.early_stopping_patience}")
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
         return best_acc, patience, False   
 
     def run(self):
-        train_loss = []
-        train_acc = []
-        val_loss = []
-        val_acc = []
         best_train_acc = 0
         best_val_acc = 0
         lowest_train_loss = 1000
@@ -179,6 +175,10 @@ class Training:
         save_model_architecture(self.model, self.model_folder + "/model_architecture.txt")
         for epoch in range(self.epochs):
             self.model.train()
+            train_acc = []
+            train_loss = []
+            val_acc = []
+            val_loss = []
             with tqdm(self.trainLoader, desc=f"Epoch {epoch+1}/{self.epochs} (Training)") as pbar:
                 for data in pbar:
                     data = data.to(self.device)
@@ -249,10 +249,6 @@ class Training:
         return True
     
     def run_pretrain(self):
-        train_loss = []
-        train_acc = []
-        val_loss = []
-        val_acc = []
         best_train_acc = 0
         best_val_acc = 0
         lowest_train_loss = 1000
@@ -266,6 +262,10 @@ class Training:
 
         for epoch in range(self.epochs):
             self.model.train()
+            train_loss = []
+            train_acc = []
+            val_loss = []
+            val_acc = []
             with tqdm(self.trainLoader, desc=f"Epoch {epoch+1}/{self.epochs} (Training)") as pbar:
                 for data in pbar:
                     self.optim.zero_grad()

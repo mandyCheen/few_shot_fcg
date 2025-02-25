@@ -383,7 +383,7 @@ class LabelPropagation(nn.Module, Loss):
         self.args = opt['settings']['few_shot']['parameters']
         self.device = opt["settings"]["train"]["device"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
-        self.relation = GraphRelationNetwork(self.opt["settings"]["model"]["hidden_size"], 64, self.args["relation_layer"])
+        self.relation = GraphRelationNetwork(self.args["dim_in"], self.args["dim_hidden"], self.args["dim_out"], self.args["relation_layer"])
         self.encoder = encoder
 
         if opt['settings']['few_shot']['parameters']['rn'] == 300:   # learned sigma, fixed alpha
@@ -433,10 +433,10 @@ class LabelPropagation(nn.Module, Loss):
         ## sigmma
         if self.args['rn'] in [30,300]:
             self.relation.to(self.device)
-            # self.sigma = self.relation(input, edge_index, batch)
+            #self.sigma = self.relation(input, edge_index, batch)
             self.sigma = F.softplus(self.relation(input, edge_index, batch))
             # sigma_pooled = scatter_mean(self.sigma, batch, dim=0)
-            self.sigma = torch.clamp(self.sigma, min=0.1, max=10.0)
+            # self.sigma = torch.clamp(self.sigma, min=0.1, max=10.0) -> No need to clamp
 
             self.sigma_support = torch.cat([self.sigma[idx_list] for idx_list in support_idxs])
             self.sigma_query = self.sigma[query_idxs]

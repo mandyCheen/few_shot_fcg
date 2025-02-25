@@ -24,9 +24,9 @@
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
-            "hidden_size": 64,
-            "output_size": 64,
-            "num_layers": 3,
+            "hidden_size": 128,
+            "output_size": 128,
+            "num_layers": 2,
             "projection": false,
             "load_weights": "",
             "pretrained_model_folder": ""
@@ -34,7 +34,7 @@
         "train": {
             "training": true,
             "validation": true,
-            "num_epochs": 500,
+            "num_epochs": 200,
             "device": "cuda:0",
             "parallel": false,
             "parallel_device": [],
@@ -46,8 +46,10 @@
                 "method": "ReduceLROnPlateau",
                 "step_size": 20,
                 "gamma": 0.5,
-                "patience": 7,
-                "factor": 0.5
+                "patience": 10,
+                "factor": 0.5,
+                "min_lr": 0.0001,
+                "cooldown": 3
             },
             "early_stopping": {
                 "use": true,
@@ -71,7 +73,10 @@
                 "class_per_iter": 5
             },
             "parameters":{
-                "relation_layer": 2,
+                "relation_layer": 1,
+                "dim_in": 128,
+                "dim_hidden": 64,
+                "dim_out": 64,
                 "rn": 300,
                 "alpha": 0.99,
                 "k": 20

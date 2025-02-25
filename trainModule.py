@@ -72,11 +72,16 @@ class TrainModule(Training):
         info = self.opt["settings"]["model"]
         if info["model_name"] == "GraphSAGE":
             if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                self.model = GraphSAGELayer(dim_in=info["input_size"], dim_h=info["hidden_size"], num_layers=info["num_layers"])
+                self.model = GraphSAGELayer(dim_in=info["input_size"], dim_h=info["hidden_size"], 
+                                            dim_o=info["output_size"], num_layers=info["num_layers"])
             else:
-                self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+                self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], 
+                                       dim_out=info["output_size"], num_layers=info["num_layers"], 
+                                       projection = info["projection"])
         elif info["model_name"] == "GCN":
-            self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+            self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], 
+                             dim_out=info["output_size"], num_layers=info["num_layers"], 
+                             projection = info["projection"])
         else:
             raise ValueError("Model not supported")
         
@@ -170,7 +175,10 @@ class TrainModule(Training):
         if self.opt["settings"]["train"]["lr_scheduler"]["method"] == "StepLR":
             scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=self.opt["settings"]["train"]["lr_scheduler"]["step_size"], gamma=self.opt["settings"]["train"]["lr_scheduler"]["gamma"])
         elif self.opt["settings"]["train"]["lr_scheduler"]["method"] == "ReduceLROnPlateau":
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=self.opt["settings"]["train"]["lr_scheduler"]["factor"], patience=self.opt["settings"]["train"]["lr_scheduler"]["patience"])
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optim, factor=self.opt["settings"]["train"]["lr_scheduler"]["factor"], 
+                                                                   patience=self.opt["settings"]["train"]["lr_scheduler"]["patience"], 
+                                                                   min_lr=self.opt["settings"]["train"]["lr_scheduler"]["min_lr"],
+                                                                   cooldown=self.opt["settings"]["train"]["lr_scheduler"]["cooldown"])
         else:
             raise ValueError("LR scheduler not supported")
         self.scheduler = scheduler
@@ -282,7 +290,7 @@ class TestModule(Testing):
         if info["model_name"] == "GraphSAGE":
             self.pretrainModel = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
             if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                self.model = GraphSAGELayer(dim_in=info["input_size"], dim_h=info["hidden_size"], num_layers=info["num_layers"])
+                self.model = GraphSAGELayer(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_o=info["output_size"], num_layers=info["num_layers"])
             else:
                 self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
         elif info["model_name"] == "GCN":

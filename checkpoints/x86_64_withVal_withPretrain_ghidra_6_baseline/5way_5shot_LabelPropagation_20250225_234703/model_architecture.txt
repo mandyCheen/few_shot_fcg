@@ -2,10 +2,10 @@ LabelPropagation(
   (relation): GraphRelationNetwork(
     (sage): GraphSAGELayer(
       (sage_convs): ModuleList(
-        (0-1): 2 x SAGEConv(64, 64, aggr=mean)
+        (0): SAGEConv(128, 64, aggr=mean)
       )
       (norms): ModuleList(
-        (0-1): 2 x BatchNorm1d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (0): BatchNorm1d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
       )
     )
     (fc): Sequential(
@@ -16,11 +16,10 @@ LabelPropagation(
   )
   (encoder): GraphSAGELayer(
     (sage_convs): ModuleList(
-      (0): SAGEConv(128, 64, aggr=mean)
-      (1-3): 3 x SAGEConv(64, 64, aggr=mean)
+      (0-1): 2 x SAGEConv(128, 128, aggr=mean)
     )
     (norms): ModuleList(
-      (0-3): 4 x BatchNorm1d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (0-1): 2 x BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
     )
   )
 )

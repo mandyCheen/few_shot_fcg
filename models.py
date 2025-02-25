@@ -203,7 +203,7 @@ class GraphClassifier(torch.nn.Module):
     
 class GraphSAGELayer(nn.Module):
     """使用PyTorch Geometric的GraphSAGE層"""
-    def __init__(self, dim_in: int, dim_h: int, num_layers: int):
+    def __init__(self, dim_in: int, dim_h: int, dim_o:int, num_layers: int):
         super().__init__()
         self.num_layers = num_layers
         
@@ -216,9 +216,14 @@ class GraphSAGELayer(nn.Module):
         self.norms.append(BatchNorm1d(dim_h))
         
         # Additional layers
-        for _ in range(num_layers - 1):
+        for _ in range(num_layers - 2):
             self.sage_convs.append(SAGEConv(dim_h, dim_h))
             self.norms.append(BatchNorm1d(dim_h))
+        
+        if num_layers > 1:
+            # Final layer
+            self.sage_convs.append(SAGEConv(dim_h, dim_o))
+            self.norms.append(BatchNorm1d(dim_o))
 
     def forward(self, x, edge_index):
         device = x.device
@@ -234,13 +239,13 @@ class GraphSAGELayer(nn.Module):
 
 class GraphRelationNetwork(nn.Module):
     """基於GraphSAGE的關係網絡"""
-    def __init__(self, input_dim, hidden_dim, layer_num):
+    def __init__(self, input_dim, hidden_dim, out_dim, layer_num):
         super(GraphRelationNetwork, self).__init__()
-        self.sage = GraphSAGELayer(input_dim, hidden_dim, num_layers=layer_num)
+        self.sage = GraphSAGELayer(input_dim, hidden_dim, out_dim, num_layers=layer_num)
         self.fc = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.Linear(out_dim, out_dim // 2),
             nn.ReLU(),
-            nn.Linear(hidden_dim // 2, 1)
+            nn.Linear(out_dim // 2, 1)
         )
 
     def forward(self, x, edge_index, batch):
