@@ -234,9 +234,9 @@ class GraphSAGELayer(nn.Module):
 
 class GraphRelationNetwork(nn.Module):
     """基於GraphSAGE的關係網絡"""
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim, hidden_dim, layer_num):
         super(GraphRelationNetwork, self).__init__()
-        self.sage = GraphSAGELayer(input_dim, hidden_dim, num_layers=1)
+        self.sage = GraphSAGELayer(input_dim, hidden_dim, num_layers=layer_num)
         self.fc = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
@@ -245,5 +245,5 @@ class GraphRelationNetwork(nn.Module):
 
     def forward(self, x, edge_index, batch):
         h = self.sage(x, edge_index)
-        h = global_mean_pool(h, batch)
+        h = global_add_pool(h, batch)
         return self.fc(h)

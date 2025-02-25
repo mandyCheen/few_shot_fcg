@@ -12,7 +12,7 @@ def save_config(config, config_path):
     with open(config_path, 'w') as f:
         json.dump(config, f, indent=4)
 
-def save_checkpoint(model_state, optim_state, sche_state, is_best, epoch, checkpoint, backbone=False):
+def save_checkpoint(model_state, optim_state, sche_state, is_best, epoch, checkpoint, value, backbone=False):
     """
     Save model checkpoint
     """
@@ -25,9 +25,9 @@ def save_checkpoint(model_state, optim_state, sche_state, is_best, epoch, checkp
             if ('best{}'.format(back) in name):
                 to_remove = os.path.join(checkpoint, name)
                 os.remove(to_remove)
-        filename = os.path.join(checkpoint, 'epoch_{}_best{}.pth'.format(epoch, back))
+        filename = os.path.join(checkpoint, 'epoch_{}_{}_best{}.pth'.format(epoch, value, back))
     else:
-        filename = os.path.join(checkpoint, 'epoch_{}_checkpoint{}.pth'.format(epoch, back))
+        filename = os.path.join(checkpoint, 'epoch_{}_{}_checkpoint{}.pth'.format(epoch, value, back))
     
     torch.save({    'epoch': epoch,
                     'model_state_dict': model_state,

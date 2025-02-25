@@ -377,20 +377,21 @@ class ClassifierLoss(Loss):
 
 class LabelPropagation(nn.Module, Loss):
     """Label Propagation"""
-    def __init__(self, opt: dict):
+    def __init__(self, opt: dict, encoder):
         super(LabelPropagation, self).__init__()
         self.opt = opt
         self.args = opt['settings']['few_shot']['parameters']
         self.device = opt["settings"]["train"]["device"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
-        self.relation = GraphRelationNetwork(self.opt["settings"]["model"]["input_size"], self.opt["settings"]["model"]["hidden_size"])
+        self.relation = GraphRelationNetwork(self.opt["settings"]["model"]["hidden_size"], 64, self.args["relation_layer"])
+        self.encoder = encoder
 
         if opt['settings']['few_shot']['parameters']['rn'] == 300:   # learned sigma, fixed alpha
             self.alpha = torch.tensor([opt['settings']['few_shot']['parameters']['alpha']], requires_grad=False).to(self.device)
         elif opt['settings']['few_shot']['parameters']['rn'] == 30:    # learned sigma, learned alpha
             self.alpha = nn.Parameter(torch.tensor([opt['settings']['few_shot']['parameters']['alpha']]).to(self.device), requires_grad=True)
 
-    def forward(self, input, target, edge_index, batch):
+    def forward(self, data):
         """
             inputs are preprocessed
             support:    (N_way*N_shot)x3x84x84
@@ -401,6 +402,12 @@ class LabelPropagation(nn.Module, Loss):
         # init
         import torch.nn.functional as F
         eps = np.finfo(float).eps
+
+        input = self.encoder(data.x, data.edge_index)
+        target = data.y
+        edge_index = data.edge_index
+        batch = data.batch
+
         _, support_idxs, query_idxs = self.get_support_query_idxs(target)
         num_classes = len(torch.unique(target))
         num_support = self.opt["settings"]["few_shot"]["train"]["support_shots"]
@@ -416,8 +423,8 @@ class LabelPropagation(nn.Module, Loss):
         s_labels = F.one_hot(s_labels_mapped, num_classes)
         q_labels = F.one_hot(q_labels_mapped, num_classes)
 
-        from torch_geometric.nn import global_mean_pool
-        pool_input = global_mean_pool(input, batch)
+        from torch_geometric.nn import global_add_pool
+        pool_input = global_add_pool(input, batch)
 
         # Step1: Embedding
         N = pool_input.shape[0]
@@ -426,9 +433,19 @@ class LabelPropagation(nn.Module, Loss):
         ## sigmma
         if self.args['rn'] in [30,300]:
             self.relation.to(self.device)
-            self.sigma = self.relation(input, edge_index, batch)
+            # self.sigma = self.relation(input, edge_index, batch)
+            self.sigma = F.softplus(self.relation(input, edge_index, batch))
             # sigma_pooled = scatter_mean(self.sigma, batch, dim=0)
-            
+            self.sigma = torch.clamp(self.sigma, min=0.1, max=10.0)
+
+            self.sigma_support = torch.cat([self.sigma[idx_list] for idx_list in support_idxs])
+            self.sigma_query = self.sigma[query_idxs]
+            self.sigma = torch.cat([ self.sigma_support, self.sigma_query], 0)
+
+            pool_input_support = torch.cat([pool_input[idx_list] for idx_list in support_idxs])
+            pool_input_query = pool_input[query_idxs]
+            pool_input = torch.cat([ pool_input_support, pool_input_query], 0)
+
             pool_input = pool_input / (self.sigma + eps)
             emb1 = torch.unsqueeze(pool_input, 1)
             emb2 = torch.unsqueeze(pool_input, 0)
@@ -442,7 +459,6 @@ class LabelPropagation(nn.Module, Loss):
             mask = mask.scatter(1, indices, 1)
             mask = ((mask + torch.t(mask)) > 0).type(torch.float32)
             W = W * mask
-
         # 正規化
         D = W.sum(0)
         D_sqrt_inv = torch.sqrt(1.0 / (D + eps))
@@ -454,21 +470,20 @@ class LabelPropagation(nn.Module, Loss):
         ys = s_labels
         yu = torch.zeros(num_classes * num_queries, num_classes).to(self.device)
         y = torch.cat((ys, yu), 0)
-        F = torch.matmul(torch.inverse(torch.eye(N).to(self.device) - self.alpha * S + eps), y)
-        Fq = F[num_classes * num_support:, :]
-        print(Fq)
+        F_ = torch.matmul(torch.inverse(torch.eye(N).to(self.device) - self.alpha * S + eps), y)
+        Fq = F_[num_classes * num_support:, :]
+
         # Step4: Cross-Entropy Loss
         ce = nn.CrossEntropyLoss().to(self.device)
         ## both support and query loss
         gt = torch.argmax(torch.cat((s_labels, q_labels), 0), 1)
-        loss = ce(F, gt)
+        loss = ce(F_, gt)
         ## acc
         predq = torch.argmax(Fq, 1)
         gtq = torch.argmax(q_labels, 1)
         correct = (predq == gtq).sum()
-        print(predq)
-        print(gtq)
+
         total = num_queries * num_classes
         acc = 1.0 * correct.float() / float(total)
-        return loss, acc
 
+        return loss, acc

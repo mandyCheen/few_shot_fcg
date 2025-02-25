@@ -112,7 +112,7 @@ class TrainModule(Training):
         elif self.opt["settings"]["few_shot"]["method"] == "SoftNnNet":
             loss_fn = SoftNnLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-            loss_fn = LabelPropagation(self.opt)
+            loss_fn = LabelPropagation(self.opt, self.model)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -196,6 +196,9 @@ class TrainModule(Training):
         if self.lr_scheduler:
             self.get_lr_scheduler()
 
+        if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+            self.model = self.loss_fn
+
         info = self.opt["settings"]["model"]
         if info["load_weights"]:
             model_path = os.path.abspath(info["load_weights"])
@@ -269,9 +272,24 @@ class TestModule(Testing):
             loss_fn = NnLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "SoftNnNet":
             loss_fn = SoftNnLoss(self.opt)
+        elif self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+            loss_fn = LabelPropagation(self.opt, self.model)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
+    def generate_model(self, opt: dict = None):
+        info = self.opt["settings"]["model"]
+        if info["model_name"] == "GraphSAGE":
+            self.pretrainModel = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                self.model = GraphSAGELayer(dim_in=info["input_size"], dim_h=info["hidden_size"], num_layers=info["num_layers"])
+            else:
+                self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+        elif info["model_name"] == "GCN":
+            self.pretrainModel = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+            self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+        else:
+            raise ValueError("Model not supported")
     
     def setting(self):
         print("Setting up the testing module...")
@@ -289,12 +307,13 @@ class TestModule(Testing):
         testGraph, label = load_GE_data(self.testDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "testData.pkl"))
         sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
         self.testLoader = DataLoader(testGraph, batch_sampler=sampler, num_workers=4, collate_fn=collate_graphs)    
-
-        self.model = GraphSAGE(dim_in=self.opt["settings"]["model"]["input_size"], dim_h=self.opt["settings"]["model"]["hidden_size"], dim_out=self.opt["settings"]["model"]["output_size"], num_layers=self.opt["settings"]["model"]["num_layers"], projection = self.opt["settings"]["model"]["projection"])
-        self.pretrainModel = GraphSAGE(dim_in=self.opt["settings"]["model"]["input_size"], dim_h=self.opt["settings"]["model"]["hidden_size"], dim_out=self.opt["settings"]["model"]["output_size"], num_layers=self.opt["settings"]["model"]["num_layers"], projection = self.opt["settings"]["model"]["projection"])
-        
+        self.generate_model()
         self.get_loss_fn()
         
+        if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+            self.model = self.loss_fn
+
+
         print("Finish setting up the testing module")
         
     

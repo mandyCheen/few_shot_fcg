@@ -87,12 +87,12 @@ class Training:
             best_acc = avg_acc
             if self.save_model:
                 self.best_model = self.model
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder)
+                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder, value=best_acc)
             if self.early_stopping:
                 patience = 0
         else:
             if self.save_model and (epoch+1) % 10 == 0:
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder)
+                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_acc)
             if self.early_stopping:
                 patience += 1
                 if patience == self.early_stopping_patience:
@@ -114,12 +114,12 @@ class Training:
             lowest_loss = avg_loss
             if self.save_model:
                 self.best_model = self.model
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder)
+                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder, value=lowest_loss)
             if self.early_stopping:
                 patience = 0
         else:
             if self.save_model and (epoch+1) % 10 == 0:
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder)
+                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_loss)
             if self.early_stopping:
                 patience += 1
                 if patience == self.early_stopping_patience:
@@ -142,14 +142,14 @@ class Training:
             best_acc = avg_acc
             if self.save_model:
                 self.best_model = self.model
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder)
-                save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder, backbone=True)
+                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder, value=best_acc)
+                save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=True, epoch=epoch+1, checkpoint=self.model_folder, backbone=True, value=best_acc)
             if self.early_stopping:
                 patience = 0
         else:
             if self.save_model and (epoch+1) % 10 == 0:
-                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder)
-                save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, backbone=True)
+                save_checkpoint(model_state=self.model.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, value=avg_acc)
+                save_checkpoint(model_state=self.model.backbone.state_dict(), optim_state=self.optim.state_dict(), sche_state=self.scheduler.state_dict(), is_best=False, epoch=epoch+1, checkpoint=self.model_folder, backbone=True, value=avg_acc)
             if self.early_stopping:
                 patience += 1
                 if patience == self.early_stopping_patience:
@@ -184,9 +184,7 @@ class Training:
                     data = data.to(self.device)
                     self.optim.zero_grad()
                     if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                        self.loss_fn.train()
-                        emb = self.model(data.x, data.edge_index)
-                        loss, acc = self.loss_fn(emb, data.y, data.edge_index, data.batch)
+                        loss, acc = self.model(data)
                     else:
                         predicts = self.model(data)
                         loss, acc = self.loss_fn(predicts, data.y)        
@@ -221,9 +219,7 @@ class Training:
                         data = data.to(self.device)
                         with torch.no_grad():
                             if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                                self.loss_fn.eval()
-                                emb = self.model(data.x, data.edge_index)
-                                loss, acc = self.loss_fn(emb, data.y, data.edge_index, data.batch)
+                                loss, acc = self.model(data)
                             else:
                                 model_output = self.model(data)
                                 loss, acc = self.loss_fn(model_output, data.y)
@@ -349,9 +345,11 @@ class Testing:
                 # print(np.unique(data.y))
                 data = data.to(self.device)
                 with torch.no_grad():
-                    model_output = testModel(data)
-                    loss, acc = self.loss_fn(model_output, data.y)
-                    
+                    if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                        loss, acc = testModel(data)
+                    else:
+                        model_output = testModel(data)
+                        loss, acc = self.loss_fn(model_output, data.y)
                     avg_acc.append(acc.item())
                     
         avg_acc = np.mean(avg_acc)
