@@ -383,8 +383,8 @@ class LabelPropagation(nn.Module, Loss):
         self.args = opt['settings']['few_shot']['parameters']
         self.device = opt["settings"]["train"]["device"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
-        self.relation = GraphRelationNetwork(self.args["dim_in"], self.args["dim_hidden"], self.args["dim_out"], self.args["relation_layer"])
         self.encoder = encoder
+        self.relation = GraphRelationNetwork(self.args["dim_in"], self.args["dim_hidden"], self.args["dim_out"], self.args["relation_layer"])
 
         if opt['settings']['few_shot']['parameters']['rn'] == 300:   # learned sigma, fixed alpha
             self.alpha = torch.tensor([opt['settings']['few_shot']['parameters']['alpha']], requires_grad=False).to(self.device)
