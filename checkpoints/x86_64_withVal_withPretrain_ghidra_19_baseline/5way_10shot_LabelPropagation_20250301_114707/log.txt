@@ -1,0 +1,320 @@
+Device: cuda:0
+Model: LabelPropagation(
+  (encoder): GraphSAGELayer(
+    (sage_convs): ModuleList(
+      (0-2): 3 x SAGEConv(128, 128, aggr=mean)
+    )
+    (norms): ModuleList(
+      (0-2): 3 x BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+  )
+  (relation): GraphRelationNetwork(
+    (sage): GraphSAGELayer(
+      (sage_convs): ModuleList(
+        (0): SAGEConv(128, 64, aggr=mean)
+        (1): SAGEConv(64, 64, aggr=mean)
+      )
+      (norms): ModuleList(
+        (0-1): 2 x BatchNorm1d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (fc): Sequential(
+      (0): Linear(in_features=64, out_features=32, bias=True)
+      (1): ReLU()
+      (2): Linear(in_features=32, out_features=1, bias=True)
+    )
+  )
+)
+Loss function: LabelPropagation(
+  (encoder): GraphSAGELayer(
+    (sage_convs): ModuleList(
+      (0-2): 3 x SAGEConv(128, 128, aggr=mean)
+    )
+    (norms): ModuleList(
+      (0-2): 3 x BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+  )
+  (relation): GraphRelationNetwork(
+    (sage): GraphSAGELayer(
+      (sage_convs): ModuleList(
+        (0): SAGEConv(128, 64, aggr=mean)
+        (1): SAGEConv(64, 64, aggr=mean)
+      )
+      (norms): ModuleList(
+        (0-1): 2 x BatchNorm1d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (fc): Sequential(
+      (0): Linear(in_features=64, out_features=32, bias=True)
+      (1): ReLU()
+      (2): Linear(in_features=32, out_features=1, bias=True)
+    )
+  )
+)
+Optimizer: Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    capturable: False
+    differentiable: False
+    eps: 1e-08
+    foreach: None
+    fused: None
+    lr: 0.001
+    maximize: False
+    weight_decay: 0
+)
+Start training...
+Epoch 1/200: Avg Train Loss: 0.7417, Avg Train Acc: 0.6384 (Best)
+Epoch 1/200: Avg Val Loss: 1.5035, Avg Val Acc: 0.5870 (Best)
+Patience: 0/20
+Epoch 2/200: Avg Train Loss: 0.6239, Avg Train Acc: 0.5622 (Best: 0.6384)
+Epoch 2/200: Avg Val Loss: 0.7707, Avg Val Acc: 0.3282 (Best: 0.5870)
+Patience: 1/20
+Epoch 3/200: Avg Train Loss: 0.5948, Avg Train Acc: 0.5846 (Best: 0.6384)
+Epoch 3/200: Avg Val Loss: 1.0543, Avg Val Acc: 0.4996 (Best: 0.5870)
+Patience: 2/20
+Epoch 4/200: Avg Train Loss: 0.5373, Avg Train Acc: 0.5844 (Best: 0.6384)
+Epoch 4/200: Avg Val Loss: 0.7824, Avg Val Acc: 0.5004 (Best: 0.5870)
+Patience: 3/20
+Epoch 5/200: Avg Train Loss: 0.5495, Avg Train Acc: 0.6424 (Best)
+Epoch 5/200: Avg Val Loss: 0.4265, Avg Val Acc: 0.6664 (Best)
+Patience: 0/20
+Epoch 6/200: Avg Train Loss: 0.5764, Avg Train Acc: 0.6918 (Best)
+Epoch 6/200: Avg Val Loss: 1.1040, Avg Val Acc: 0.7362 (Best)
+Patience: 0/20
+Epoch 7/200: Avg Train Loss: 0.5407, Avg Train Acc: 0.7370 (Best)
+Epoch 7/200: Avg Val Loss: 1.1529, Avg Val Acc: 0.6558 (Best: 0.7362)
+Patience: 1/20
+Epoch 8/200: Avg Train Loss: 0.4534, Avg Train Acc: 0.6832 (Best: 0.7370)
+Epoch 8/200: Avg Val Loss: 0.6617, Avg Val Acc: 0.5832 (Best: 0.7362)
+Patience: 2/20
+Epoch 9/200: Avg Train Loss: 0.4957, Avg Train Acc: 0.6404 (Best: 0.7370)
+Epoch 9/200: Avg Val Loss: 0.5761, Avg Val Acc: 0.6584 (Best: 0.7362)
+Patience: 3/20
+Epoch 10/200: Avg Train Loss: 0.4662, Avg Train Acc: 0.7294 (Best: 0.7370)
+Epoch 10/200: Avg Val Loss: 0.6277, Avg Val Acc: 0.6580 (Best: 0.7362)
+Patience: 4/20
+Epoch 11/200: Avg Train Loss: 0.5143, Avg Train Acc: 0.7402 (Best)
+Epoch 11/200: Avg Val Loss: 0.7598, Avg Val Acc: 0.6564 (Best: 0.7362)
+Patience: 5/20
+Epoch 12/200: Avg Train Loss: 0.4884, Avg Train Acc: 0.7470 (Best)
+Epoch 12/200: Avg Val Loss: 1.0042, Avg Val Acc: 0.6638 (Best: 0.7362)
+Patience: 6/20
+Epoch 13/200: Avg Train Loss: 0.5147, Avg Train Acc: 0.7064 (Best: 0.7470)
+Epoch 13/200: Avg Val Loss: 0.6742, Avg Val Acc: 0.6230 (Best: 0.7362)
+Patience: 7/20
+Epoch 14/200: Avg Train Loss: 0.4442, Avg Train Acc: 0.6802 (Best: 0.7470)
+Epoch 14/200: Avg Val Loss: 0.6838, Avg Val Acc: 0.7724 (Best)
+Patience: 0/20
+Epoch 15/200: Avg Train Loss: 0.3903, Avg Train Acc: 0.7162 (Best: 0.7470)
+Epoch 15/200: Avg Val Loss: 0.6737, Avg Val Acc: 0.5886 (Best: 0.7724)
+Patience: 1/20
+Epoch 16/200: Avg Train Loss: 0.4739, Avg Train Acc: 0.6828 (Best: 0.7470)
+Epoch 16/200: Avg Val Loss: 0.5354, Avg Val Acc: 0.6484 (Best: 0.7724)
+Patience: 2/20
+Epoch 17/200: Avg Train Loss: 0.4267, Avg Train Acc: 0.7214 (Best: 0.7470)
+Epoch 17/200: Avg Val Loss: 0.5451, Avg Val Acc: 0.7002 (Best: 0.7724)
+Patience: 3/20
+Epoch 18/200: Avg Train Loss: 0.4048, Avg Train Acc: 0.7514 (Best)
+Epoch 18/200: Avg Val Loss: 0.3832, Avg Val Acc: 0.7440 (Best: 0.7724)
+Patience: 4/20
+Epoch 19/200: Avg Train Loss: 0.3843, Avg Train Acc: 0.7916 (Best)
+Epoch 19/200: Avg Val Loss: 0.4367, Avg Val Acc: 0.6508 (Best: 0.7724)
+Patience: 5/20
+Epoch 20/200: Avg Train Loss: 0.3572, Avg Train Acc: 0.7552 (Best: 0.7916)
+Epoch 20/200: Avg Val Loss: 0.4791, Avg Val Acc: 0.7474 (Best: 0.7724)
+Patience: 6/20
+Epoch 21/200: Avg Train Loss: 0.3897, Avg Train Acc: 0.7870 (Best: 0.7916)
+Epoch 21/200: Avg Val Loss: 0.4083, Avg Val Acc: 0.7390 (Best: 0.7724)
+Patience: 7/20
+Epoch 22/200: Avg Train Loss: 0.4312, Avg Train Acc: 0.7448 (Best: 0.7916)
+Epoch 22/200: Avg Val Loss: 0.5960, Avg Val Acc: 0.6576 (Best: 0.7724)
+Patience: 8/20
+Epoch 23/200: Avg Train Loss: 0.3758, Avg Train Acc: 0.7332 (Best: 0.7916)
+Epoch 23/200: Avg Val Loss: 0.6845, Avg Val Acc: 0.6354 (Best: 0.7724)
+Patience: 9/20
+Epoch 24/200: Avg Train Loss: 0.3776, Avg Train Acc: 0.6952 (Best: 0.7916)
+Epoch 24/200: Avg Val Loss: 0.6280, Avg Val Acc: 0.6366 (Best: 0.7724)
+Patience: 10/20
+Epoch 25/200: Avg Train Loss: 0.3566, Avg Train Acc: 0.7782 (Best: 0.7916)
+Epoch 25/200: Avg Val Loss: 0.5705, Avg Val Acc: 0.7438 (Best: 0.7724)
+Patience: 11/20
+Epoch 26/200: Avg Train Loss: 0.3644, Avg Train Acc: 0.7850 (Best: 0.7916)
+Epoch 26/200: Avg Val Loss: 0.6353, Avg Val Acc: 0.6908 (Best: 0.7724)
+Patience: 12/20
+Epoch 27/200: Avg Train Loss: 0.3371, Avg Train Acc: 0.7552 (Best: 0.7916)
+Epoch 27/200: Avg Val Loss: 0.5915, Avg Val Acc: 0.6944 (Best: 0.7724)
+Patience: 13/20
+Epoch 28/200: Avg Train Loss: 0.3971, Avg Train Acc: 0.7016 (Best: 0.7916)
+Epoch 28/200: Avg Val Loss: 0.7029, Avg Val Acc: 0.4862 (Best: 0.7724)
+Patience: 14/20
+Epoch 29/200: Avg Train Loss: 0.3737, Avg Train Acc: 0.7516 (Best: 0.7916)
+Epoch 29/200: Avg Val Loss: 0.8030, Avg Val Acc: 0.7450 (Best: 0.7724)
+Patience: 15/20
+Epoch 30/200: Avg Train Loss: 0.3988, Avg Train Acc: 0.7692 (Best: 0.7916)
+Epoch 30/200: Avg Val Loss: 0.6810, Avg Val Acc: 0.6860 (Best: 0.7724)
+Patience: 16/20
+Epoch 31/200: Avg Train Loss: 0.3290, Avg Train Acc: 0.7832 (Best: 0.7916)
+Epoch 31/200: Avg Val Loss: 0.5817, Avg Val Acc: 0.7358 (Best: 0.7724)
+Patience: 17/20
+Epoch 32/200: Avg Train Loss: 0.3359, Avg Train Acc: 0.7666 (Best: 0.7916)
+Epoch 32/200: Avg Val Loss: 0.4810, Avg Val Acc: 0.6988 (Best: 0.7724)
+Patience: 18/20
+Epoch 33/200: Avg Train Loss: 0.3495, Avg Train Acc: 0.7574 (Best: 0.7916)
+Epoch 33/200: Avg Val Loss: 0.5585, Avg Val Acc: 0.7038 (Best: 0.7724)
+Patience: 19/20
+Epoch 34/200: Avg Train Loss: 0.3176, Avg Train Acc: 0.7904 (Best: 0.7916)
+Epoch 34/200: Avg Val Loss: 0.5436, Avg Val Acc: 0.7756 (Best)
+Patience: 0/20
+Epoch 35/200: Avg Train Loss: 0.2941, Avg Train Acc: 0.8350 (Best)
+Epoch 35/200: Avg Val Loss: 0.6049, Avg Val Acc: 0.7854 (Best)
+Patience: 0/20
+Epoch 36/200: Avg Train Loss: 0.3233, Avg Train Acc: 0.7932 (Best: 0.8350)
+Epoch 36/200: Avg Val Loss: 0.6116, Avg Val Acc: 0.7402 (Best: 0.7854)
+Patience: 1/20
+Epoch 37/200: Avg Train Loss: 0.3446, Avg Train Acc: 0.8010 (Best: 0.8350)
+Epoch 37/200: Avg Val Loss: 0.5624, Avg Val Acc: 0.6988 (Best: 0.7854)
+Patience: 2/20
+Epoch 38/200: Avg Train Loss: 0.3274, Avg Train Acc: 0.7730 (Best: 0.8350)
+Epoch 38/200: Avg Val Loss: 0.5914, Avg Val Acc: 0.7342 (Best: 0.7854)
+Patience: 3/20
+Epoch 39/200: Avg Train Loss: 0.3056, Avg Train Acc: 0.8020 (Best: 0.8350)
+Epoch 39/200: Avg Val Loss: 0.6051, Avg Val Acc: 0.7548 (Best: 0.7854)
+Patience: 4/20
+Epoch 40/200: Avg Train Loss: 0.3468, Avg Train Acc: 0.8438 (Best)
+Epoch 40/200: Avg Val Loss: 0.5339, Avg Val Acc: 0.7788 (Best: 0.7854)
+Patience: 5/20
+Epoch 41/200: Avg Train Loss: 0.2889, Avg Train Acc: 0.8410 (Best: 0.8438)
+Epoch 41/200: Avg Val Loss: 0.5815, Avg Val Acc: 0.7860 (Best)
+Patience: 0/20
+Epoch 42/200: Avg Train Loss: 0.2851, Avg Train Acc: 0.8260 (Best: 0.8438)
+Epoch 42/200: Avg Val Loss: 0.6209, Avg Val Acc: 0.7818 (Best: 0.7860)
+Patience: 1/20
+Epoch 43/200: Avg Train Loss: 0.2930, Avg Train Acc: 0.8406 (Best: 0.8438)
+Epoch 43/200: Avg Val Loss: 0.5145, Avg Val Acc: 0.8126 (Best)
+Patience: 0/20
+Epoch 44/200: Avg Train Loss: 0.2794, Avg Train Acc: 0.8514 (Best)
+Epoch 44/200: Avg Val Loss: 0.5343, Avg Val Acc: 0.7862 (Best: 0.8126)
+Patience: 1/20
+Epoch 45/200: Avg Train Loss: 0.2629, Avg Train Acc: 0.8438 (Best: 0.8514)
+Epoch 45/200: Avg Val Loss: 0.5457, Avg Val Acc: 0.8014 (Best: 0.8126)
+Patience: 2/20
+Epoch 46/200: Avg Train Loss: 0.2520, Avg Train Acc: 0.8642 (Best)
+Epoch 46/200: Avg Val Loss: 0.7783, Avg Val Acc: 0.7880 (Best: 0.8126)
+Patience: 3/20
+Epoch 47/200: Avg Train Loss: 0.2457, Avg Train Acc: 0.8502 (Best: 0.8642)
+Epoch 47/200: Avg Val Loss: 0.5635, Avg Val Acc: 0.7540 (Best: 0.8126)
+Patience: 4/20
+Epoch 48/200: Avg Train Loss: 0.3326, Avg Train Acc: 0.8552 (Best: 0.8642)
+Epoch 48/200: Avg Val Loss: 0.5633, Avg Val Acc: 0.7774 (Best: 0.8126)
+Patience: 5/20
+Epoch 49/200: Avg Train Loss: 0.2866, Avg Train Acc: 0.8558 (Best: 0.8642)
+Epoch 49/200: Avg Val Loss: 0.6231, Avg Val Acc: 0.8234 (Best)
+Patience: 0/20
+Epoch 50/200: Avg Train Loss: 0.3520, Avg Train Acc: 0.8418 (Best: 0.8642)
+Epoch 50/200: Avg Val Loss: 0.4892, Avg Val Acc: 0.8012 (Best: 0.8234)
+Patience: 1/20
+Epoch 51/200: Avg Train Loss: 0.3167, Avg Train Acc: 0.8334 (Best: 0.8642)
+Epoch 51/200: Avg Val Loss: 0.7302, Avg Val Acc: 0.7776 (Best: 0.8234)
+Patience: 2/20
+Epoch 52/200: Avg Train Loss: 0.3051, Avg Train Acc: 0.8600 (Best: 0.8642)
+Epoch 52/200: Avg Val Loss: 0.7110, Avg Val Acc: 0.8068 (Best: 0.8234)
+Patience: 3/20
+Epoch 53/200: Avg Train Loss: 0.2690, Avg Train Acc: 0.8452 (Best: 0.8642)
+Epoch 53/200: Avg Val Loss: 0.7667, Avg Val Acc: 0.7702 (Best: 0.8234)
+Patience: 4/20
+Epoch 54/200: Avg Train Loss: 0.2989, Avg Train Acc: 0.8296 (Best: 0.8642)
+Epoch 54/200: Avg Val Loss: 0.3621, Avg Val Acc: 0.7108 (Best: 0.8234)
+Patience: 5/20
+Epoch 55/200: Avg Train Loss: 0.2734, Avg Train Acc: 0.8120 (Best: 0.8642)
+Epoch 55/200: Avg Val Loss: 0.5071, Avg Val Acc: 0.7590 (Best: 0.8234)
+Patience: 6/20
+Epoch 56/200: Avg Train Loss: 0.3515, Avg Train Acc: 0.8108 (Best: 0.8642)
+Epoch 56/200: Avg Val Loss: 0.5639, Avg Val Acc: 0.7370 (Best: 0.8234)
+Patience: 7/20
+Epoch 57/200: Avg Train Loss: 0.2701, Avg Train Acc: 0.8120 (Best: 0.8642)
+Epoch 57/200: Avg Val Loss: 0.5199, Avg Val Acc: 0.6952 (Best: 0.8234)
+Patience: 8/20
+Epoch 58/200: Avg Train Loss: 0.2855, Avg Train Acc: 0.8020 (Best: 0.8642)
+Epoch 58/200: Avg Val Loss: 0.4857, Avg Val Acc: 0.7086 (Best: 0.8234)
+Patience: 9/20
+Epoch 59/200: Avg Train Loss: 0.2651, Avg Train Acc: 0.8290 (Best: 0.8642)
+Epoch 59/200: Avg Val Loss: 0.5842, Avg Val Acc: 0.7598 (Best: 0.8234)
+Patience: 10/20
+Epoch 60/200: Avg Train Loss: 0.2950, Avg Train Acc: 0.8216 (Best: 0.8642)
+Epoch 60/200: Avg Val Loss: 0.5378, Avg Val Acc: 0.7744 (Best: 0.8234)
+Patience: 11/20
+Epoch 61/200: Avg Train Loss: 0.2738, Avg Train Acc: 0.8506 (Best: 0.8642)
+Epoch 61/200: Avg Val Loss: 0.5093, Avg Val Acc: 0.7804 (Best: 0.8234)
+Patience: 12/20
+Epoch 62/200: Avg Train Loss: 0.2724, Avg Train Acc: 0.8410 (Best: 0.8642)
+Epoch 62/200: Avg Val Loss: 0.5987, Avg Val Acc: 0.7538 (Best: 0.8234)
+Patience: 13/20
+Epoch 63/200: Avg Train Loss: 0.2651, Avg Train Acc: 0.8340 (Best: 0.8642)
+Epoch 63/200: Avg Val Loss: 0.5464, Avg Val Acc: 0.7942 (Best: 0.8234)
+Patience: 14/20
+Epoch 64/200: Avg Train Loss: 0.3173, Avg Train Acc: 0.8506 (Best: 0.8642)
+Epoch 64/200: Avg Val Loss: 0.5701, Avg Val Acc: 0.8424 (Best)
+Patience: 0/20
+Epoch 65/200: Avg Train Loss: 0.2578, Avg Train Acc: 0.8610 (Best: 0.8642)
+Epoch 65/200: Avg Val Loss: 0.5311, Avg Val Acc: 0.7362 (Best: 0.8424)
+Patience: 1/20
+Epoch 66/200: Avg Train Loss: 0.2618, Avg Train Acc: 0.8262 (Best: 0.8642)
+Epoch 66/200: Avg Val Loss: 0.6214, Avg Val Acc: 0.8224 (Best: 0.8424)
+Patience: 2/20
+Epoch 67/200: Avg Train Loss: 0.2824, Avg Train Acc: 0.8538 (Best: 0.8642)
+Epoch 67/200: Avg Val Loss: 0.6651, Avg Val Acc: 0.8092 (Best: 0.8424)
+Patience: 3/20
+Epoch 68/200: Avg Train Loss: 0.2752, Avg Train Acc: 0.8454 (Best: 0.8642)
+Epoch 68/200: Avg Val Loss: 0.5069, Avg Val Acc: 0.7532 (Best: 0.8424)
+Patience: 4/20
+Epoch 69/200: Avg Train Loss: 0.2789, Avg Train Acc: 0.8580 (Best: 0.8642)
+Epoch 69/200: Avg Val Loss: 0.5606, Avg Val Acc: 0.7684 (Best: 0.8424)
+Patience: 5/20
+Epoch 70/200: Avg Train Loss: 0.3352, Avg Train Acc: 0.8312 (Best: 0.8642)
+Epoch 70/200: Avg Val Loss: 0.4440, Avg Val Acc: 0.6704 (Best: 0.8424)
+Patience: 6/20
+Epoch 71/200: Avg Train Loss: 0.2709, Avg Train Acc: 0.8398 (Best: 0.8642)
+Epoch 71/200: Avg Val Loss: 0.5062, Avg Val Acc: 0.6854 (Best: 0.8424)
+Patience: 7/20
+Epoch 72/200: Avg Train Loss: 0.3009, Avg Train Acc: 0.8478 (Best: 0.8642)
+Epoch 72/200: Avg Val Loss: 0.5173, Avg Val Acc: 0.7716 (Best: 0.8424)
+Patience: 8/20
+Epoch 73/200: Avg Train Loss: 0.2235, Avg Train Acc: 0.8662 (Best)
+Epoch 73/200: Avg Val Loss: 0.5904, Avg Val Acc: 0.8016 (Best: 0.8424)
+Patience: 9/20
+Epoch 74/200: Avg Train Loss: 0.2477, Avg Train Acc: 0.8586 (Best: 0.8662)
+Epoch 74/200: Avg Val Loss: 0.4663, Avg Val Acc: 0.7396 (Best: 0.8424)
+Patience: 10/20
+Epoch 75/200: Avg Train Loss: 0.2490, Avg Train Acc: 0.8530 (Best: 0.8662)
+Epoch 75/200: Avg Val Loss: 0.5599, Avg Val Acc: 0.7510 (Best: 0.8424)
+Patience: 11/20
+Epoch 76/200: Avg Train Loss: 0.2687, Avg Train Acc: 0.8480 (Best: 0.8662)
+Epoch 76/200: Avg Val Loss: 0.4780, Avg Val Acc: 0.7352 (Best: 0.8424)
+Patience: 12/20
+Epoch 77/200: Avg Train Loss: 0.2783, Avg Train Acc: 0.8492 (Best: 0.8662)
+Epoch 77/200: Avg Val Loss: 0.4663, Avg Val Acc: 0.8284 (Best: 0.8424)
+Patience: 13/20
+Epoch 78/200: Avg Train Loss: 0.2854, Avg Train Acc: 0.8540 (Best: 0.8662)
+Epoch 78/200: Avg Val Loss: 0.6594, Avg Val Acc: 0.7136 (Best: 0.8424)
+Patience: 14/20
+Epoch 79/200: Avg Train Loss: 0.2381, Avg Train Acc: 0.8426 (Best: 0.8662)
+Epoch 79/200: Avg Val Loss: 0.5758, Avg Val Acc: 0.7840 (Best: 0.8424)
+Patience: 15/20
+Epoch 80/200: Avg Train Loss: 0.2852, Avg Train Acc: 0.8468 (Best: 0.8662)
+Epoch 80/200: Avg Val Loss: 0.5636, Avg Val Acc: 0.8018 (Best: 0.8424)
+Patience: 16/20
+Epoch 81/200: Avg Train Loss: 0.2824, Avg Train Acc: 0.8510 (Best: 0.8662)
+Epoch 81/200: Avg Val Loss: 0.5575, Avg Val Acc: 0.7508 (Best: 0.8424)
+Patience: 17/20
+Epoch 82/200: Avg Train Loss: 0.2334, Avg Train Acc: 0.8590 (Best: 0.8662)
+Epoch 82/200: Avg Val Loss: 0.4907, Avg Val Acc: 0.8062 (Best: 0.8424)
+Patience: 18/20
+Epoch 83/200: Avg Train Loss: 0.2900, Avg Train Acc: 0.8522 (Best: 0.8662)
+Epoch 83/200: Avg Val Loss: 0.5490, Avg Val Acc: 0.7390 (Best: 0.8424)
+Patience: 19/20
+Epoch 84/200: Avg Train Loss: 0.3437, Avg Train Acc: 0.8584 (Best: 0.8662)
+Epoch 84/200: Avg Val Loss: 0.6341, Avg Val Acc: 0.7608 (Best: 0.8424)
+Early stopping in epoch 84
+Finish training

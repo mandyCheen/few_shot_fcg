@@ -27,7 +27,7 @@ for seed in seeds:
         if exp == "5way_5shot" or exp == "5way_10shot":
             options["settings"]["few_shot"]["parameters"]["k"] = 15
         else:
-            options["settings"]["few_shot"]["parameters"]["k"] = 25
+            options["settings"]["few_shot"]["parameters"]["k"] = 20
         options["settings"]["seed"] = seed
         save_config(options, "./config/config_label_prop.json")
 
