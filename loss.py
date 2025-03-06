@@ -168,6 +168,40 @@ class Loss:
         ))).view(-1)
         
         return classes, support_idxs, query_idxs
+    
+    def reshape_random_data(self, data, target, n_ways, n_shot, n_queries):
+        """
+        Reshape randomly organized data into (n_ways, n_shot + n_queries, n_features) format
+        Returns:
+            Reshaped data of shape (n_ways, n_shot + n_queries, n_features)
+        """
+        # Set n_support for the get_support_query_idxs function
+        n_support = n_shot
+        
+        # Get classes, support indices, and query indices
+        classes, support_idxs, query_idxs = self.get_support_query_idxs(target)
+        
+        # Get feature dimension
+        n_features = data.shape[1]
+        
+        # Initialize the result tensor
+        result = torch.zeros(n_ways, n_shot + n_queries, n_features)
+        
+        # Fill in support samples
+        for i, c in enumerate(classes):
+            # Get support samples for this class
+            class_support = data[support_idxs[i]]
+            # Place them in the result tensor
+            result[i, :n_shot] = class_support
+        
+        # Fill in query samples
+        query_data = data[query_idxs]
+        # Reshape query data to (n_ways, n_queries, n_features)
+        query_data = query_data.reshape(n_ways, n_queries, n_features)
+        # Place them after the support samples
+        result[:, n_shot:] = query_data
+        
+        return result
 
 class ProtoLoss(Loss):
     """Prototypical Networks Loss with multiple distance metrics"""
@@ -487,3 +521,61 @@ class LabelPropagation(nn.Module, Loss):
         acc = 1.0 * correct.float() / float(total)
 
         return loss, acc
+    
+    def get_processed_data(self, data):
+            """
+            Process data through the model and return the processed results
+            
+            Parameters:
+            data: The input data
+            
+            Returns:
+            The processed data (N_way*N_shot + N_way*N_query) x N_features
+            """
+            import torch.nn.functional as F
+            eps = np.finfo(float).eps
+
+            # Extract initial embeddings
+            input = self.encoder(data.x, data.edge_index)
+            target = data.y
+            edge_index = data.edge_index
+            batch = data.batch
+
+            # Get support and query indices
+            _, support_idxs, query_idxs = self.get_support_query_idxs(target)
+            num_classes = len(torch.unique(target))
+            num_support = self.opt["settings"]["few_shot"]["train"]["support_shots"]
+            num_queries = 20 - num_support
+
+            # Process labels
+            s_labels_ori = torch.cat([target[idx_list] for idx_list in support_idxs])
+            q_labels_ori = target[query_idxs]
+            unique_labels = torch.unique(torch.cat([s_labels_ori, q_labels_ori]))
+            label_map = {label.item(): idx for idx, label in enumerate(unique_labels)}
+            s_labels_mapped = torch.tensor([label_map[label.item()] for label in s_labels_ori]).to(self.device)
+            q_labels_mapped = torch.tensor([label_map[label.item()] for label in q_labels_ori]).to(self.device)
+            
+            # Generate one-hot labels
+            s_labels = F.one_hot(s_labels_mapped, num_classes)
+            q_labels = F.one_hot(q_labels_mapped, num_classes)
+
+            # Pool embeddings
+            from torch_geometric.nn import global_add_pool
+            pool_input = global_add_pool(input, batch)
+
+            # Graph construction
+            if self.args['rn'] in [30, 300]:
+                self.relation.to(self.device)
+                sigma = F.softplus(self.relation(input, edge_index, batch))
+                
+                sigma_support = torch.cat([sigma[idx_list] for idx_list in support_idxs])
+                sigma_query = sigma[query_idxs]
+                sigma_combined = torch.cat([sigma_support, sigma_query], 0)
+                
+                pool_input_support = torch.cat([pool_input[idx_list] for idx_list in support_idxs])
+                pool_input_query = pool_input[query_idxs]
+                pool_input_combined = torch.cat([pool_input_support, pool_input_query], 0)
+                
+                normalized_pool_input = pool_input_combined / (sigma_combined + eps)
+            
+            return normalized_pool_input

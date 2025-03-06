@@ -303,13 +303,13 @@ class TestModule(Testing):
         print("Setting up the testing module...")
         print(f"Loading data from {self.embeddingFolder}...")
 
-        if self.valDataset is not None:
-            print("Loading validation data...")
-            self.valGraph, label =load_GE_data(self.valDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "valData.pkl"))
-            val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
-            self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4, collate_fn=collate_graphs)
-        else:
-            self.valLoader = None
+        # if self.valDataset is not None:
+        #     print("Loading validation data...")
+        #     self.valGraph, label =load_GE_data(self.valDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "valData.pkl"))
+        #     val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
+        #     self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4, collate_fn=collate_graphs)
+        # else:
+        #     self.valLoader = None
     
         print("Loading testing data...")
         testGraph, label = load_GE_data(self.testDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "testData.pkl"))
@@ -323,7 +323,12 @@ class TestModule(Testing):
 
 
         print("Finish setting up the testing module")
-        
+    
+    def load_best_model(self):
+        model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
+        self.model.load_state_dict(torch.load(model_path, map_location=self.device)["model_state_dict"])
+        print(f"Model loaded from {model_path}")
+        self.model = self.model.to(self.device)
     
     def eval(self, model_path: str = None):
         

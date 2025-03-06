@@ -42,3 +42,34 @@ def save_model_architecture(model, model_path):
 def record_log(log_file, content):
     with open(log_file, "a") as f:
         f.write(content)
+
+def reshape_processed_data(processed_data, n_ways, n_shot, n_queries):
+    """
+    Reshape the processed data
+    processed_data dimension: (n_ways * n_shot + n_ways * n_queries, n_features)
+    result dimension: (n_ways, n_shot + n_queries, n_features)
+        
+    Returns:
+        torch.Tensor, reshaped data
+    """
+    
+    n_features = processed_data.shape[1]
+    
+    # First, we need to separate support and query sets
+    support_size = n_ways * n_shot
+    query_size = n_ways * n_queries
+    
+    # Split the data
+    support_data = processed_data[:support_size]
+    query_data = processed_data[support_size:]
+    
+    # Reshape support data to (n_ways, n_shot, n_features)
+    support_data = support_data.reshape(n_ways, n_shot, n_features)
+    
+    # Reshape query data to (n_ways, n_queries, n_features)
+    query_data = query_data.reshape(n_ways, n_queries, n_features)
+    
+    # Concatenate along the second axis to get (n_ways, n_shot + n_queries, n_features)
+    result = torch.cat([support_data, query_data], dim=1)
+    
+    return result

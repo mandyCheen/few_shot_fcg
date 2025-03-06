@@ -24,16 +24,20 @@ for seed in seeds:
         options["settings"]["few_shot"]["test"]["query_shots"] = 20 - shots
         options["settings"]["few_shot"]["train"]["class_per_iter"] = way
         options["settings"]["few_shot"]["test"]["class_per_iter"] = way
-        if exp == "5way_5shot" or exp == "5way_10shot":
-            options["settings"]["few_shot"]["parameters"]["k"] = 15
-        else:
-            options["settings"]["few_shot"]["parameters"]["k"] = 20
+        options["settings"]["few_shot"]["parameters"]["alpha"] = 0.7
+        options["settings"]["few_shot"]["parameters"]["k"] = 20
+        # if exp == "5way_5shot" or exp == "5way_10shot":
+        #     options["settings"]["few_shot"]["parameters"]["k"] = 15
+        # elif exp == "5way_10shot" or exp == "10way_5shot":
+        #     options["settings"]["few_shot"]["parameters"]["k"] = 20
+        # else:
+        #     options["settings"]["few_shot"]["parameters"]["k"] = 40
         options["settings"]["seed"] = seed
         save_config(options, "./config/config_label_prop.json")
 
         dataset = LoadDataset(options, pretrain=False)
-        vectorizer = FCGVectorize(options, dataset)
-        vectorizer.node_embedding(dataset.rawDataset)
+        # vectorizer = FCGVectorize(options, dataset)
+        # vectorizer.node_embedding(dataset.rawDataset)
         trainModule = TrainModule(options, dataset)
         trainModule.train()
 
