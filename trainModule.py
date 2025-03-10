@@ -123,49 +123,10 @@ class TrainModule(Training):
         self.loss_fn = loss_fn
     def get_optimizer(self):
         if self.opt["settings"]["train"]["optimizer"] == "Adam":
-            if self.opt["settings"]["model"]["projection"]:
-                optimizer = torch.optim.Adam([
-                    {
-                        "params": self.model.output_proj.parameters(),
-                        "lr": self.opt["settings"]["train"]["projection_lr"]
-                    },
-                    {
-                        "params": (p for n, p in self.model.named_parameters()
-                                   if not n.startswith("output_proj")),
-                        "lr": self.opt["settings"]["train"]["lr"]
-                    }
-                ])
-            else:
                 optimizer = torch.optim.Adam(self.model.parameters(), lr=self.opt["settings"]["train"]["lr"])
         elif self.opt["settings"]["train"]["optimizer"] == "AdamW":
-            if self.opt["settings"]["model"]["projection"]:
-                optimizer = torch.optim.AdamW([
-                    {
-                        "params": self.model.output_proj.parameters(),
-                        "lr": self.opt["settings"]["train"]["projection_lr"]
-                    },
-                    {
-                        "params": (p for n, p in self.model.named_parameters()
-                                   if not n.startswith("output_proj")),
-                        "lr": self.opt["settings"]["train"]["lr"]
-                    }
-                ])
-            else:
                 optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.opt["settings"]["train"]["lr"])
         elif self.opt["settings"]["train"]["optimizer"] == "SGD":
-            if self.opt["settings"]["model"]["projection"]:
-                optimizer = torch.optim.SGD([
-                    {
-                        "params": self.model.output_proj.parameters(),
-                        "lr": self.opt["settings"]["train"]["projection_lr"]
-                    },
-                    {
-                        "params": (p for n, p in self.model.named_parameters()
-                                   if not n.startswith("output_proj")),
-                        "lr": self.opt["settings"]["train"]["lr"]
-                    }
-                ])
-            else:
                 optimizer = torch.optim.SGD(self.model.parameters(), lr=self.opt["settings"]["train"]["lr"])
         else:
             raise ValueError("Optimizer not supported")
@@ -200,12 +161,11 @@ class TrainModule(Training):
 
         self.get_backbone()
         self.get_loss_fn()
+        if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+            self.model = self.loss_fn
         self.get_optimizer()
         if self.lr_scheduler:
             self.get_lr_scheduler()
-
-        if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-            self.model = self.loss_fn
 
         info = self.opt["settings"]["model"]
         if info["load_weights"]:
