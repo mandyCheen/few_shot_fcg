@@ -280,7 +280,7 @@ if __name__ == '__main__':
         model_folder = os.path.join(test.model_folder)
         name = os.path.basename(model_folder)
         parent_folder = os.path.basename(os.path.dirname(model_folder))
-        ndata_path = os.path.join(test.embeddingFolder, "protoLP_{}_{}.pkl".format(parent_folder, name))
+        ndata_path = os.path.join(test.embeddingFolder, "protoLP_{}_{}_{}.pkl".format(parent_folder, name, n_runs))
         if not os.path.exists(ndata_path):
             ndatas = GenerateRunSet(test)
             torch.save(ndatas, ndata_path)
