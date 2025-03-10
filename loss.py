@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import numpy as np
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout
 from models import GraphRelationNetwork
-from torch_scatter import scatter_mean
 
 class DistanceMetric:
     """Base class for distance metrics"""

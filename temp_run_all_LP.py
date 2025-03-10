@@ -24,8 +24,8 @@ for seed in seeds:
         options["settings"]["few_shot"]["test"]["query_shots"] = 20 - shots
         options["settings"]["few_shot"]["train"]["class_per_iter"] = way
         options["settings"]["few_shot"]["test"]["class_per_iter"] = way
-        options["settings"]["few_shot"]["parameters"]["alpha"] = 0.7
-        options["settings"]["few_shot"]["parameters"]["k"] = 20
+        options["settings"]["few_shot"]["parameters"]["alpha"] = 0.99
+        options["settings"]["few_shot"]["parameters"]["k"] = 15
         # if exp == "5way_5shot" or exp == "5way_10shot":
         #     options["settings"]["few_shot"]["parameters"]["k"] = 15
         # elif exp == "5way_10shot" or exp == "10way_5shot":
