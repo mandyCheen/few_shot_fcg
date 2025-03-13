@@ -1,11 +1,12 @@
-
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import torch.nn as nn
 from torch_geometric.loader import DataLoader 
 from loadDatasetPretrained import LoadDatasetPretrained
 from datetime import datetime
 import torch.nn.functional as F
-import os
 from tqdm import tqdm
 from train_utils import Training, load_GE_data
 from models import GraphClassifier
@@ -108,11 +109,14 @@ class PretrainModule(Training):
         print(f"Device: {self.device}")
 
         if self.parallel and len(self.parallel_device) > 1:
-            model = nn.DataParallel(model.to(self.device), device_ids=self.parallel_device, output_device=self.parallel_device[0]) 
+            print("Using multiple GPUs: ", self.parallel_device)
+            model = model.to(self.parallel_device[0])
+            model = nn.DataParallel(model, device_ids=self.parallel_device, output_device=self.parallel_device[0]) 
         elif self.parallel:
             print("You didn't specify the device ids for parallel training")
-            print("Using all available devices", torch.cuda.device_count(), "GPUs")       
-            model = nn.DataParallel(model.to(self.device), output_device=0)
+            print("Using all available devices", torch.cuda.device_count(), "GPUs")    
+            model = model.to("cuda:0")   
+            model = nn.DataParallel(model, output_device=0)
         else:
             model = model.to(self.device)
 
