@@ -7,7 +7,7 @@ import os
 
 
 if __name__ == '__main__':
-    options = load_config("./config/config_para_pretrain.json")
+    options = load_config("./config/config_pretrain.json")
     dataset = LoadDatasetPretrained(options)
     # vectorize = FCGVectorize(options, dataset, pretrain=True)
     # vectorize.node_embedding(dataset.rawDataset)

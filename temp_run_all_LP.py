@@ -6,45 +6,44 @@ from trainModule import TrainModule
 from trainModule import TestModule
 import os
 
-
-options = load_config("./config/config_label_prop.json")
 warnings.filterwarnings("ignore")
 
 expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
 seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
-alphaList = [0.7, 0.9, 0.99] # 0.5, 0.6
+# alphaList = [0.7, 0.9, 0.99] # 0.5, 0.6
 ## always with pretrain
-for alpha in alphaList:
-    if alpha == 0.7:
-        seeds = [10, 666, 11, 19, 22, 31, 42, 888]
-    else:
-        seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
-    print("alpha: ", alpha)
-    for seed in seeds:
-        print("seed: ", seed)
-        for exp in expList:
-            if seed == 10 and alpha == 0.7 and (exp == "5way_5shot" or exp == "5way_10shot" or exp == "10way_5shot"):
-                continue
-            print("exp: ", exp)
-            options["settings"]["name"] = exp+"_LabelPropagation_alpha{}_k20".format(alpha)
-            shots = int(exp.split("_")[1].split("shot")[0])
-            way = int(exp.split("_")[0].split("way")[0])
-            options["settings"]["few_shot"]["train"]["support_shots"] = shots
-            options["settings"]["few_shot"]["train"]["query_shots"] = 20 - shots
-            options["settings"]["few_shot"]["test"]["support_shots"] = shots
-            options["settings"]["few_shot"]["test"]["query_shots"] = 20 - shots
-            options["settings"]["few_shot"]["train"]["class_per_iter"] = way
-            options["settings"]["few_shot"]["test"]["class_per_iter"] = way
-            options["settings"]["few_shot"]["parameters"]["alpha"] = alpha
-            options["settings"]["few_shot"]["parameters"]["k"] = 20
-            options["settings"]["seed"] = seed
-            save_config(options, "./config/config_label_prop.json")
+# for alpha in alphaList:
+#     if alpha == 0.7:
+#         seeds = [10, 666, 11, 19, 22, 31, 42, 888]
+#     else:
+#         seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
+#     print("alpha: ", alpha)
+for seed in seeds:
+    print("seed: ", seed)
+    for exp in expList:
+        # if seed == 10 and alpha == 0.7 and (exp == "5way_5shot" or exp == "5way_10shot" or exp == "10way_5shot"):
+        #     continue
+        options = load_config("./config/config_label_prop_pretrain.json")
+        print("exp: ", exp)
+        options["settings"]["name"] = exp+"_LabelPropagation_alpha0.7_k20_pretrained"
+        shots = int(exp.split("_")[1].split("shot")[0])
+        way = int(exp.split("_")[0].split("way")[0])
+        options["settings"]["few_shot"]["train"]["support_shots"] = shots
+        options["settings"]["few_shot"]["train"]["query_shots"] = 20 - shots
+        options["settings"]["few_shot"]["test"]["support_shots"] = shots
+        options["settings"]["few_shot"]["test"]["query_shots"] = 20 - shots
+        options["settings"]["few_shot"]["train"]["class_per_iter"] = way
+        options["settings"]["few_shot"]["test"]["class_per_iter"] = way
+        # options["settings"]["few_shot"]["parameters"]["alpha"] = alpha
+        options["settings"]["few_shot"]["parameters"]["k"] = 20
+        options["settings"]["seed"] = seed
+        save_config(options, "./config/config_label_prop_pretrain.json")
 
-            dataset = LoadDataset(options, pretrain=False)
-            # vectorizer = FCGVectorize(options, dataset)
-            # vectorizer.node_embedding(dataset.rawDataset)
-            trainModule = TrainModule(options, dataset)
-            trainModule.train()
+        dataset = LoadDataset(options, pretrain=False)
+        # vectorizer = FCGVectorize(options, dataset)
+        # vectorizer.node_embedding(dataset.rawDataset)
+        trainModule = TrainModule(options, dataset)
+        trainModule.train()
 
-            test = TestModule(os.path.join(trainModule.model_folder, "config.json"), dataset, options)
-            test.eval()
+        test = TestModule(os.path.join(trainModule.model_folder, "config.json"), dataset, options)
+        test.eval()
