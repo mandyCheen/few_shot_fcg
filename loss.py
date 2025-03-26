@@ -521,6 +521,20 @@ class LabelPropagation(nn.Module, Loss):
 
         return loss, acc
     
+    def get_encoded_data(self, data):
+        """
+        Encode input data using the model and return the encoded results
+        """
+        input = self.encoder(data.x, data.edge_index)
+        target = data.y
+        edge_index = data.edge_index
+        batch = data.batch
+
+        from torch_geometric.nn import global_add_pool
+        pool_input = global_add_pool(input, batch)
+
+        return pool_input
+
     def get_processed_data(self, data):
             """
             Process data through the model and return the processed results
