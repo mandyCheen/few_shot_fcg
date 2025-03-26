@@ -90,7 +90,45 @@ class TrainModule(Training):
             model_folder = os.path.join(self.pretrain_folder, info["pretrained_model_folder"])
             model_path = os.path.join(model_folder, [f for f in os.listdir(model_folder) if "best_backbone" in f][0])
             checkpoint = torch.load(model_path, map_location=self.device)
-            self.model.load_state_dict(checkpoint["model_state_dict"], strict=False)
+            # self.model.load_state_dict(checkpoint["model_state_dict"], strict=False)
+            state_dict = checkpoint["model_state_dict"]
+
+            # Get the model's current state dictionary
+            model_state_dict = self.model.state_dict()
+
+            # Track which layers are loaded
+            loaded_layers = []
+            missing_layers = []
+            unexpected_layers = []
+
+            # Load with strict=False
+            self.model.load_state_dict(state_dict, strict=False)
+
+            # Check which layers were loaded
+            for name, param in self.model.named_parameters():
+                if name in state_dict:
+                    loaded_layers.append(name)
+                else:
+                    missing_layers.append(name)
+
+            # Check for parameters in state_dict that aren't in the model
+            for name in state_dict:
+                if name not in model_state_dict:
+                    unexpected_layers.append(name)
+
+            # Print summary
+            print(f"Loaded {len(loaded_layers)} layers:")
+            for layer in loaded_layers:
+                print(f"  - {layer}")
+
+            print(f"\nSkipped {len(missing_layers)} layers (not in checkpoint):")
+            for layer in missing_layers:
+                print(f"  - {layer}")
+
+            print(f"\nIgnored {len(unexpected_layers)} layers (not in model):")
+            for layer in unexpected_layers:
+                print(f"  - {layer}")
+                
             print(f"Model loaded from {model_path}")
             record_log(self.log_file, f"Pretrained model loaded from {model_path}\n")
         

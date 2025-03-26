@@ -102,6 +102,7 @@ class Training:
         if self.early_stopping:
             print(f"Patience: {patience}/{self.early_stopping_patience}")
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
+        torch.cuda.empty_cache()
         return best_acc, patience, False
 
     def end_of_epoch_loss(self, avg_loss, lowest_loss, epoch, patience):
@@ -129,6 +130,7 @@ class Training:
         if self.early_stopping:
             print(f"Patience: {patience}/{self.early_stopping_patience}")
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
+        torch.cuda.empty_cache()
         return lowest_loss, patience, False
     
     def end_of_epoch_pretrain(self, avg_acc, best_acc, epoch, patience, avg_loss):
@@ -159,6 +161,7 @@ class Training:
         if self.early_stopping:
             print(f"Patience: {patience}/{self.early_stopping_patience}")
             record_log(self.log_file, f"Patience: {patience}/{self.early_stopping_patience}\n")
+        torch.cuda.empty_cache()
         return best_acc, patience, False   
 
     def run(self):
@@ -351,6 +354,7 @@ class Testing:
                         model_output = testModel(data)
                         loss, acc = self.loss_fn(model_output, data.y)
                     avg_acc.append(acc.item())
+            torch.cuda.empty_cache()
                     
         avg_acc = np.mean(avg_acc)
         print(f"Testing accuracy: {avg_acc:.4f}")
