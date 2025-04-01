@@ -39,6 +39,10 @@ class TrainModule(Training):
         self.support_shots_test = opt["settings"]["few_shot"]["test"]["support_shots"]
         self.query_shots_test = opt["settings"]["few_shot"]["test"]["query_shots"]
         self.class_per_iter_test = opt["settings"]["few_shot"]["test"]["class_per_iter"]
+        
+        if self.enable_openset:
+            self.openset_m_samples = opt["settings"]["openset"]["train"]["m_samples"]
+            self.openset_class_per_iter = opt["settings"]["openset"]["train"]["class_per_iter"]
 
         self.iterations = opt["settings"]["train"]["iterations"]
         self.device = opt["settings"]["train"]["device"]
@@ -187,12 +191,21 @@ class TrainModule(Training):
         print(f"Loading data from {self.embeddingFolder}...")
         print("Loading training data...")
         self.trainGraph, label = load_GE_data(self.trainDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "trainData.pkl"))
-        sampler = FcgSampler(label, self.support_shots_train + self.query_shots_train, self.class_per_iter_train, self.iterations)
+        
+        if self.enable_openset:
+            assert(self.openset_m_samples <= self.support_shots_train + self.query_shots_train)
+            sampler = FcgSampler(label, self.support_shots_train + self.query_shots_train, self.class_per_iter_train + self.openset_class_per_iter, self.iterations)
+        else:
+            sampler = FcgSampler(label, self.support_shots_train + self.query_shots_train, self.class_per_iter_train, self.iterations)
         self.trainLoader = DataLoader(self.trainGraph, batch_sampler=sampler, num_workers=4, collate_fn=collate_graphs)    
         if self.valDataset is not None:
             print("Loading validation data...")
             self.valGraph, label =load_GE_data(self.valDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "valData.pkl"))
-            val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
+            if self.enable_openset:
+                assert(self.openset_m_samples <= self.support_shots_train + self.query_shots_train)
+                val_sampler = FcgSampler(label, self.support_shots_train + self.query_shots_train, self.class_per_iter_train + self.openset_class_per_iter, self.iterations)
+            else:
+                val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
             self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4, collate_fn=collate_graphs)
         else:
             self.valLoader = None
@@ -251,7 +264,7 @@ class TestModule(Testing):
         self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], dataset.datasetName, opt["settings"]["vectorize"]["node_embedding_method"])
         self.testDataset = dataset.testData
         self.valDataset = dataset.valData
-        self.testGraph = []
+        self.opensetData = dataset.opensetData
         self.loss_fn = None
         self.opt = opt
 
@@ -300,25 +313,31 @@ class TestModule(Testing):
     def setting(self):
         print("Setting up the testing module...")
         print(f"Loading data from {self.embeddingFolder}...")
-
-        # if self.valDataset is not None:
-        #     print("Loading validation data...")
-        #     self.valGraph, label =load_GE_data(self.valDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "valData.pkl"))
-        #     val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
-        #     self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4, collate_fn=collate_graphs)
-        # else:
-        #     self.valLoader = None
     
         print("Loading testing data...")
         testGraph, label = load_GE_data(self.testDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "testData.pkl"))
         sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
         self.testLoader = DataLoader(testGraph, batch_sampler=sampler, num_workers=4, collate_fn=collate_graphs)    
+        
+        print("Loading openset data...")
+        
+        if self.opensetData is not None:
+            print("Loading openset data...")
+            if self.opt["dataset"]["openset_data_mode"] == "random":
+                ratio = self.opt["dataset"]["openset_data_ratio"]
+                opensetPklName = f"opensetData_random_{ratio}.pkl"
+                info = f"random_{ratio}"
+            else:
+                opensetPklName = "opensetData.pkl"
+                info = ""
+            opensetGraph, label = load_GE_data(self.opensetData, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, opensetPklName), openset=True, opensetInfo=info)
+            self.opensetLoader = DataLoader(opensetGraph, batch_size=20, shuffle=True, num_workers=4, collate_fn=collate_graphs)
+        
         self.generate_model()
         self.get_loss_fn()
         
         if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
             self.model = self.loss_fn
-
 
         print("Finish setting up the testing module")
     
@@ -353,29 +372,40 @@ class TestModule(Testing):
         print("Start evaluation... (testing dataset)")
         testAcc = self.testing(self.model, self.testLoader)
 
-        # print("Start evaluation... (validation dataset)")
-        # valAcc = self.testing(self.model, self.valLoader)
-
         with open(evalLogPath, "a") as f:
             f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}\n")
-        
-        # if self.opt["settings"]["model"]["pretrained_model_folder"] != "":
-        #     pretrainModelFolder = os.path.join(self.pretrain_folder, self.opt["settings"]["model"]["pretrained_model_folder"])
-        #     pretrainModelPath = os.path.join(pretrainModelFolder, [f for f in os.listdir(pretrainModelFolder) if "best_backbone" in f][0])
-        #     self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
-        # else:
-        #     pretrainModelPath = "None"
-        # print(f"Ablation evaluation... (testing dataset)")
-        # self.pretrainModel = self.pretrainModel.to(self.device)
-        
-        # testAccPretrain = self.testing(self.pretrainModel, self.testLoader)
-        # print(f"Ablation evaluation... (validation dataset)")
-        # valAccPretrain = self.testing(self.pretrainModel, self.valLoader)
-        
-        # with open(evalLogPath, "a") as f:
-        #     f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}, {valAccPretrain}\n")
             
         print("Finish evaluation")
+
+    def openset_eval(self, model_path: str = None):
+        if model_path is None:
+            print("Model path is not provided. Using the best model...")
+            model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
+        
+        evalFolder = os.path.dirname(model_path)
+        logFolder = os.path.dirname(self.model_folder)
+
+        print("Record evaluation log...")
+        evalLogPath = os.path.join(logFolder, "evalLog.csv")
+        if not os.path.exists(evalLogPath):
+            with open(evalLogPath, "w") as f:
+                f.write("timestamp, folderName, model, test_acc, openset_auroc \n")
+
+        self.model.load_state_dict(torch.load(model_path, map_location=self.device)["model_state_dict"])
+        print("Best model loaded")
+        self.model = self.model.to(self.device)
+        
+        print(f"Model: {self.model}")
+        print("Start evaluation... (openset dataset)")
+
+        testAcc = self.openset_testing(self.model, self.testLoader)
+
+        with open(evalLogPath, "a") as f:
+            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {self.model.openset_auroc}\n")
+            
+        print("Finish evaluation")
+
+
 
     def eval_ablation(self, model_path: str = None): ## Just eval ablation part
         if model_path is None:
@@ -401,9 +431,7 @@ class TestModule(Testing):
         self.pretrainModel = self.pretrainModel.to(self.device)
         
         testAccPretrain = self.testing(self.pretrainModel, self.testLoader)
-        # print(f"Ablation evaluation... (validation dataset)")
-        # valAccPretrain = self.testing(self.pretrainModel, self.valLoader)
-        
+
         with open(evalLogPath, "a") as f:
             f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}\n")
             

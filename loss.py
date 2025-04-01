@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout
 from models import GraphRelationNetwork
+from torch_geometric.nn import global_add_pool
 
 class DistanceMetric:
     """Base class for distance metrics"""
@@ -147,6 +148,7 @@ LOSS_FUNCTIONS = {
 class Loss:
     def __init__(self, n_support):
         self.n_support = n_support
+        self.openset_auroc = 0.0
         
     def compute_prototypes(self, input, support_idxs):
         """Compute prototype vectors"""
@@ -156,18 +158,33 @@ class Loss:
         """Get nearest neighbor points"""
         return torch.cat([input[idx_list] for idx_list in support_idxs])
     
-    def get_support_query_idxs(self, target):
+    def get_support_query_idxs(self, target, openset=False, cls_openset=None):
         """Split data into support and query sets"""
         def supp_idxs(c):
             return target.eq(c).nonzero()[:self.n_support].squeeze(1)
         classes = torch.unique(target)
-        support_idxs = list(map(supp_idxs, classes))
-        query_idxs = torch.stack(list(map(
-            lambda c: target.eq(c).nonzero()[self.n_support:], classes
-        ))).view(-1)
+        cls_num = len(classes)
+        if openset:
+            assert cls_openset is not None, "cls_support must be provided for openset"
+            cls_support = cls_num - cls_openset
+            # Randomly select classes for support
+            random_classes = classes[torch.randperm(len(classes))]
+            support_idxs = list(map(supp_idxs, random_classes[:cls_support]))
+            query_idxs = torch.stack(list(map(
+                lambda c: target.eq(c).nonzero()[self.n_support:], random_classes[:cls_support]
+            ))).view(-1)
+            openset_idxs = torch.stack(list(map(
+                lambda c: target.eq(c).nonzero()[:], random_classes[cls_support:]
+            ))).view(-1)
+            return random_classes, support_idxs, query_idxs, openset_idxs
+        else:
+            support_idxs = list(map(supp_idxs, classes))
+            query_idxs = torch.stack(list(map(
+                lambda c: target.eq(c).nonzero()[self.n_support:], classes
+            ))).view(-1)
         
-        return classes, support_idxs, query_idxs
-    
+            return classes, support_idxs, query_idxs
+
     def reshape_random_data(self, data, target, n_ways, n_shot, n_queries):
         """
         Reshape randomly organized data into (n_ways, n_shot + n_queries, n_features) format
@@ -201,6 +218,128 @@ class Loss:
         result[:, n_shot:] = query_data
         
         return result
+
+    def get_avg_distance_between_support(self, input, target):
+        """
+        Compute average distance between support samples of the same class
+        """
+
+        class_avg_distances = []
+
+        _, support_idxs, query_idxs = self.get_support_query_idxs(target)
+
+        for class_idx, idx_list in enumerate(support_idxs):
+            # Get support samples for this class
+            class_support_samples = input[idx_list]
+                
+            # Compute pairwise distances within this class
+            class_dists = self.distance_metric.compute(class_support_samples, class_support_samples)
+            
+            # Create a mask to exclude self-distances (diagonal elements)
+            mask = ~torch.eye(len(idx_list), dtype=torch.bool, device=class_dists.device)
+            
+            # Calculate mean of non-diagonal elements (actual distances between different samples)
+            class_avg_dist = class_dists[mask].mean()
+            print(f"Class {class_idx}: Average distance = {class_avg_dist.item()}")
+            class_avg_distances.append(class_avg_dist)
+        
+        # Convert to tensor for easier computation
+        distances_tensor = torch.stack(class_avg_distances)
+        
+        # Calculate Q1 (25th percentile) and Q3 (75th percentile)
+        q1, q3 = torch.quantile(distances_tensor, torch.tensor([0.25, 0.75], device=distances_tensor.device))
+        
+        # Calculate IQR (Interquartile Range)
+        iqr = q3 - q1
+        
+        # Define bounds for outlier detection (typically 1.5 * IQR)
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        
+        print(f"Lower bound: {lower_bound.item()}, Upper bound: {upper_bound.item()}")
+
+        # Filter out outliers
+        valid_distances = distances_tensor[(distances_tensor >= lower_bound) & (distances_tensor <= upper_bound)]
+        
+        # Calculate mean of non-outlier distances
+        if len(valid_distances) > 0:
+            avg_distance = torch.mean(valid_distances)
+        else:
+            # If all are outliers (rare case), just use median
+            avg_distance = torch.median(distances_tensor)
+
+        return avg_distance
+    def get_query_distance_between_support(self, input, target):
+        """
+        Compute distance between support samples and query samples
+        """
+
+        _, support_idxs, query_idxs = self.get_support_query_idxs(target)
+        # Get the support samples
+        support_samples = torch.cat([input[idx_list] for idx_list in support_idxs])
+        # Get the query samples
+        query_samples = input[query_idxs]
+        # Compute the pairwise distances
+        dists = self.distance_metric.compute(query_samples, support_samples)
+        return dists
+
+    def get_openset_distance_between_support(self, input, target, openset):
+        """
+        Compute distance between support samples and open set samples
+        """
+        _, support_idxs, query_idxs = self.get_support_query_idxs(target)
+        # Get the support samples
+        support_samples = torch.cat([input[idx_list] for idx_list in support_idxs])
+        # Compute the pairwise distances
+        dists = self.distance_metric.compute(openset, support_samples)
+        return dists
+
+    def roc_area_calc(self, dist, closed, descending=True):
+        """
+        計算ROC曲線下面積
+        
+        參數:
+            dist (torch.Tensor): 分數或距離，用於識別開放集樣本
+            closed (torch.Tensor): 標記樣本是closed-set(1)還是open-set(-1)的二元標籤
+            descending (bool): 排序順序，True表示降序排列（高分表示closed-set）
+        
+        返回:
+            float: ROC曲線下面積
+        """
+        _, p = dist.sort(descending=descending)
+        closed_p = closed[p]
+        
+        # 計算closed-set和open-set樣本的總數
+        total_closed = (closed == 1).sum().item()
+        total_open = (closed == -1).sum().item()
+        
+        if total_closed == 0 or total_open == 0:
+            return 0.0
+            
+        height = 0.0
+        width = 0.0
+        area = 0.0
+        pre = 0  # (0: width; 1: height)
+        
+        for i in range(len(closed_p)):
+            if closed_p[i] == -1:  # open-set樣本
+                if pre == 0:
+                    area += height * width
+                    width = 0.0
+                    height += 1.0
+                    pre = 1
+                else:
+                    height += 1.0
+            else:  # closed-set樣本
+                pre = 0
+                width += 1.0
+                
+        if pre == 0:
+            area += height * width
+            
+        # 除以總高度和總寬度進行標準化
+        area = area / total_open / total_closed
+        return area
 
 class ProtoLoss(Loss):
     """Prototypical Networks Loss with multiple distance metrics"""
@@ -416,9 +555,15 @@ class LabelPropagation(nn.Module, Loss):
         self.args = opt['settings']['few_shot']['parameters']
         self.device = opt["settings"]["train"]["device"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
+        self.cls_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
+        self.openset_loss_scale = opt.get("settings", {}).get("openset", {}).get("train", {}).get("loss_weight", 0.5)
         self.encoder = encoder
         self.relation = GraphRelationNetwork(self.args["dim_in"], self.args["dim_hidden"], self.args["dim_out"], self.args["relation_layer"])
 
+        self.metric_name = opt["settings"]["train"]["distance"]
+        self.distance_metric = DISTANCE_METRICS[self.metric_name]
+        
         if opt['settings']['few_shot']['parameters']['rn'] == 300:   # learned sigma, fixed alpha
             self.alpha = torch.tensor([opt['settings']['few_shot']['parameters']['alpha']], requires_grad=False).to(self.device)
         elif opt['settings']['few_shot']['parameters']['rn'] == 30:    # learned sigma, learned alpha
@@ -441,10 +586,16 @@ class LabelPropagation(nn.Module, Loss):
         edge_index = data.edge_index
         batch = data.batch
 
-        _, support_idxs, query_idxs = self.get_support_query_idxs(target)
-        num_classes = len(torch.unique(target))
-        num_support = self.opt["settings"]["few_shot"]["train"]["support_shots"]
-        num_queries = 20 - num_support
+        if self.enable_openset:
+            # get support and query indices
+            _, support_idxs, query_idxs, openset_idxs = self.get_support_query_idxs(target, openset=True, cls_openset=self.cls_openset)
+            num_support_classes = len(torch.unique(target)) - self.cls_openset
+            num_open_samples = len(openset_idxs)
+        else:
+            _, support_idxs, query_idxs = self.get_support_query_idxs(target)
+            num_support_classes = len(torch.unique(target))
+            num_open_samples = 0
+        num_queries = 20 - self.n_support
 
         s_labels_ori = torch.cat([target[idx_list] for idx_list in support_idxs])
         q_labels_ori = target[query_idxs]
@@ -453,10 +604,9 @@ class LabelPropagation(nn.Module, Loss):
         s_labels_mapped = torch.tensor([label_map[label.item()] for label in s_labels_ori]).to(self.device)
         q_labels_mapped = torch.tensor([label_map[label.item()] for label in q_labels_ori]).to(self.device)
         # generate one-hot labels
-        s_labels = F.one_hot(s_labels_mapped, num_classes)
-        q_labels = F.one_hot(q_labels_mapped, num_classes)
+        s_labels = F.one_hot(s_labels_mapped, num_support_classes)
+        q_labels = F.one_hot(q_labels_mapped, num_support_classes)
 
-        from torch_geometric.nn import global_add_pool
         pool_input = global_add_pool(input, batch)
 
         # Step1: Embedding
@@ -473,11 +623,21 @@ class LabelPropagation(nn.Module, Loss):
 
             self.sigma_support = torch.cat([self.sigma[idx_list] for idx_list in support_idxs])
             self.sigma_query = self.sigma[query_idxs]
-            self.sigma = torch.cat([ self.sigma_support, self.sigma_query], 0)
+
+            if self.enable_openset:
+                self.sigma_openset = self.sigma[openset_idxs]
+                self.sigma = torch.cat([self.sigma_support, self.sigma_query, self.sigma_openset], 0)
+            else:
+                self.sigma = torch.cat([ self.sigma_support, self.sigma_query], 0)
 
             pool_input_support = torch.cat([pool_input[idx_list] for idx_list in support_idxs])
             pool_input_query = pool_input[query_idxs]
-            pool_input = torch.cat([ pool_input_support, pool_input_query], 0)
+
+            if self.enable_openset:
+                pool_input_openset = pool_input[openset_idxs]
+                pool_input = torch.cat([pool_input_support, pool_input_query, pool_input_openset], 0)
+            else:
+                pool_input = torch.cat([ pool_input_support, pool_input_query], 0)
 
             pool_input = pool_input / (self.sigma + eps)
             emb1 = torch.unsqueeze(pool_input, 1)
@@ -492,6 +652,7 @@ class LabelPropagation(nn.Module, Loss):
             mask = mask.scatter(1, indices, 1)
             mask = ((mask + torch.t(mask)) > 0).type(torch.float32)
             W = W * mask
+
         # 正規化
         D = W.sum(0)
         D_sqrt_inv = torch.sqrt(1.0 / (D + eps))
@@ -501,23 +662,56 @@ class LabelPropagation(nn.Module, Loss):
 
         # Step3: Label Propagation, F = (I-\alpha S)^{-1}Y
         ys = s_labels
-        yu = torch.zeros(num_classes * num_queries, num_classes).to(self.device)
-        y = torch.cat((ys, yu), 0)
+        yu = torch.zeros(num_support_classes * num_queries, num_support_classes).to(self.device)
+
+        if self.enable_openset and num_open_samples > 0:
+            yo = torch.zeros(num_open_samples, num_support_classes).to(self.device)
+            y = torch.cat((ys, yu, yo), 0)
+        else:
+            y = torch.cat((ys, yu), 0)
+        
         F_ = torch.matmul(torch.inverse(torch.eye(N).to(self.device) - self.alpha * S + eps), y)
-        Fq = F_[num_classes * num_support:, :]
+
+        # Fq = F_[num_support_classes * self.n_support:, :]
+        Fq = F_[num_support_classes * self.n_support : num_support_classes * self.n_support + num_support_classes * num_queries, :]
+
+        if self.enable_openset and num_open_samples > 0:
+            Fo = F_[num_support_classes * self.n_support + num_support_classes * num_queries:, :]
 
         # Step4: Cross-Entropy Loss
         ce = nn.CrossEntropyLoss().to(self.device)
         ## both support and query loss
         gt = torch.argmax(torch.cat((s_labels, q_labels), 0), 1)
-        loss = ce(F_, gt)
+        F_sq = F_[:num_support_classes * self.n_support + num_support_classes * num_queries, :]
+
+        loss = ce(F_sq, gt)
         ## acc
         predq = torch.argmax(Fq, 1)
         gtq = torch.argmax(q_labels, 1)
         correct = (predq == gtq).sum()
 
-        total = num_queries * num_classes
+        total = num_queries * num_support_classes
         acc = 1.0 * correct.float() / float(total)
+
+        if self.enable_openset and num_open_samples > 0:
+            prob_open = F.softmax(Fo, dim=1)
+            log_prob_open = F.log_softmax(Fo, dim=1)
+            entropy_loss = -(prob_open * log_prob_open).sum(dim=1).mean()
+
+            open_loss = -entropy_loss
+            loss = loss + self.openset_loss_scale * open_loss
+
+            # claculate open set auroc
+            query_max_probs = F.softmax(Fq, dim=1).max(dim=1)[0]
+            openset_max_probs = F.softmax(Fo, dim=1).max(dim=1)[0]
+
+            all_scores = torch.cat([query_max_probs, openset_max_probs], dim=0)
+            closed_labels = torch.cat([
+                torch.ones(query_max_probs.size(0), device=self.device),
+                -torch.ones(openset_max_probs.size(0), device=self.device)
+            ], dim=0)
+
+            self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=True)
 
         return loss, acc
     
@@ -526,8 +720,6 @@ class LabelPropagation(nn.Module, Loss):
         Encode input data using the model and return the encoded results
         """
         input = self.encoder(data.x, data.edge_index)
-        target = data.y
-        edge_index = data.edge_index
         batch = data.batch
 
         from torch_geometric.nn import global_add_pool
@@ -573,7 +765,6 @@ class LabelPropagation(nn.Module, Loss):
             q_labels = F.one_hot(q_labels_mapped, num_classes)
 
             # Pool embeddings
-            from torch_geometric.nn import global_add_pool
             pool_input = global_add_pool(input, batch)
 
             # Graph construction

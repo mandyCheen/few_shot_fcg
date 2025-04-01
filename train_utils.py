@@ -12,7 +12,7 @@ from datetime import datetime
 
 
 
-def load_GE_data(dataset: pd.DataFrame, embeddingFolder: str, embeddingSize: int, dataPath: str):
+def load_GE_data(dataset: pd.DataFrame, embeddingFolder: str, embeddingSize: int, dataPath: str, openset: bool = False, opensetInfo: str = None):
     if not os.path.exists(dataPath):
         labels = []
         graphList = []
@@ -36,7 +36,11 @@ def load_GE_data(dataset: pd.DataFrame, embeddingFolder: str, embeddingSize: int
         labels_ = le.transform(labels)
         folder = os.path.dirname(dataPath)
         labelDict = dict(zip(le.classes_, le.transform(le.classes_)))
-        with open(f"{folder}/labelDict.pkl", "wb") as f:
+        if openset:
+            labelDictName = f"labelDict_openset_{opensetInfo}.pkl"
+        else:
+            labelDictName = "labelDict.pkl"
+        with open(f"{folder}/{labelDictName}", "wb") as f:
             pickle.dump(labelDict, f)
         for i, data in enumerate(graphList):
             data.y = torch.tensor(labels_[i])
@@ -69,6 +73,8 @@ class Training:
         self.early_stopping = opt["settings"]["train"]["early_stopping"]["use"]
         self.early_stopping_patience = opt["settings"]["train"]["early_stopping"]["patience"]
 
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
+
         self.model_folder = model_path     
         os.makedirs(self.model_folder, exist_ok=True)   
         self.log_file = self.model_folder + "/log.txt"
@@ -83,6 +89,7 @@ class Training:
             elif self.opt["settings"]["train"]["lr_scheduler"]["method"] == "StepLR":
                 self.scheduler.step()
             print(f"Current learning rate: {self.scheduler.get_last_lr()}")
+            record_log(self.log_file, f"Current learning rate: {self.scheduler.get_last_lr()}\n")
         if avg_acc >= best_acc:
             best_acc = avg_acc
             if self.save_model:
@@ -111,6 +118,8 @@ class Training:
                 self.scheduler.step(avg_loss)
             elif self.opt["settings"]["train"]["lr_scheduler"]["method"] == "StepLR":
                 self.scheduler.step()
+            print(f"Current learning rate: {self.scheduler.get_last_lr()}")
+            record_log(self.log_file, f"Current learning rate: {self.scheduler.get_last_lr()}\n")
         if avg_loss <= lowest_loss:
             lowest_loss = avg_loss
             if self.save_model:
@@ -214,6 +223,8 @@ class Training:
                 #     lowest_train_loss = avg_loss
                 print(content)
                 record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
+                if self.enable_openset:
+                    record_log(self.log_file, 'Open-Set AUROC: {:.4f}'.format(self.model.open_set_auroc))
 
             if self.valLoader is not None: 
                 self.model.eval()                
@@ -242,6 +253,8 @@ class Training:
                     # content = f'Avg Val Loss: {avg_loss:.4f}{postfix}, Avg Val Acc: {avg_acc:.4f}'
                     print(content)
                     record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
+                    if self.enable_openset:
+                        record_log(self.log_file, 'Open-Set AUROC: {:.4f}'.format(self.model.open_set_auroc))
                     best_val_acc, patience, stop = self.end_of_epoch(avg_acc, best_val_acc, epoch, patience, avg_loss)
                     # lowest_val_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_val_loss, epoch, patience)
             else:
@@ -346,6 +359,27 @@ class Testing:
             for data in tqdm(testLoader, desc="Testing"):
                 testModel.eval()
                 # print(np.unique(data.y))
+                data = data.to(self.device)
+                with torch.no_grad():
+                    if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                        loss, acc = testModel(data)
+                    else:
+                        model_output = testModel(data)
+                        loss, acc = self.loss_fn(model_output, data.y)
+                    avg_acc.append(acc.item())
+            torch.cuda.empty_cache()
+                    
+        avg_acc = np.mean(avg_acc)
+        print(f"Testing accuracy: {avg_acc:.4f}")
+        
+        return avg_acc
+
+    def openset_testing(self, testModel, testLoader, opensetLoader):
+        avg_acc = list()
+        for epoch in range(10):
+            print(f"Epoch {epoch+1}")
+            for data in tqdm(testLoader, desc="Testing"):
+                testModel.eval()
                 data = data.to(self.device)
                 with torch.no_grad():
                     if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":

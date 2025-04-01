@@ -30,6 +30,15 @@ class LoadDataset:
             self.familyCpuList = self.rawDataset.groupby("family")["CPU"].unique().to_dict()
             self.datasetName = f"{self.cpuArch}{splitByCpu}{val}{pretrain_}_{self.reverseTool}_{self.seed}"
             self.trainData, self.testData, self.valData = self.load_all_datasets()
+            ## openset
+            self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
+            if self.enable_openset:
+                rawOSDatasetPath = os.path.join(opt["paths"]["data"]["csv_folder"], opt["dataset"]["openset_raw"])
+                self.rawOSDataset = pd.read_csv(rawOSDatasetPath)
+                self.opensetDataRatio = opt["dataset"]["openset_data_ratio"]
+                self.opensetData = self.load_openset_data(mode=opt["dataset"]["openset_data_mode"])
+            else:
+                self.opensetData = None
     
     def write_split_dataset(self, mode, familyList) -> None:
         if not os.path.exists(self.datasetSplitFolder):
@@ -125,3 +134,15 @@ class LoadDataset:
         trainData, testData = train_test_split(self.rawDataset, test_size=splitRate[1], random_state=self.seed)
         trainData, valData = train_test_split(trainData, test_size=splitRate[2], random_state=self.seed)
         return trainData, testData, valData
+    
+    def load_openset_data(self, mode: str) -> pd.DataFrame:
+        print("Loading openset data...")
+
+        if mode == "all":
+            opensetData = self.rawOSDataset
+        elif mode == "random":
+            opensetData = self.rawOSDataset.sample(frac=self.opensetDataRatio, random_state=self.seed)
+            opensetData = opensetData.reset_index(drop=True)
+
+        print(f"Openset data shape: {opensetData.shape}")
+        return opensetData
