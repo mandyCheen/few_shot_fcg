@@ -224,7 +224,7 @@ class Training:
                 print(content)
                 record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
                 if self.enable_openset:
-                    record_log(self.log_file, 'Open-Set AUROC: {:.4f}'.format(self.model.open_set_auroc))
+                    record_log(self.log_file, 'Open-Set AUROC: {:.4f}\n'.format(self.model.openset_auroc))
 
             if self.valLoader is not None: 
                 self.model.eval()                
@@ -254,7 +254,7 @@ class Training:
                     print(content)
                     record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
                     if self.enable_openset:
-                        record_log(self.log_file, 'Open-Set AUROC: {:.4f}'.format(self.model.open_set_auroc))
+                        record_log(self.log_file, 'Open-Set AUROC: {:.4f}\n'.format(self.model.openset_auroc))
                     best_val_acc, patience, stop = self.end_of_epoch(avg_acc, best_val_acc, epoch, patience, avg_loss)
                     # lowest_val_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_val_loss, epoch, patience)
             else:
@@ -352,7 +352,7 @@ class Testing:
         self.device = device
         self.loss_fn = loss_fn
     
-    def testing(self, testModel, testLoader):
+    def testing(self, testModel, testLoader, openset=False):
         avg_acc = list()
         for epoch in range(10):
             print(f"Epoch {epoch+1}")
@@ -362,7 +362,7 @@ class Testing:
                 data = data.to(self.device)
                 with torch.no_grad():
                     if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                        loss, acc = testModel(data)
+                        loss, acc = testModel(data, opensetTesting=openset)
                     else:
                         model_output = testModel(data)
                         loss, acc = self.loss_fn(model_output, data.y)
@@ -374,24 +374,4 @@ class Testing:
         
         return avg_acc
 
-    def openset_testing(self, testModel, testLoader, opensetLoader):
-        avg_acc = list()
-        for epoch in range(10):
-            print(f"Epoch {epoch+1}")
-            for data in tqdm(testLoader, desc="Testing"):
-                testModel.eval()
-                data = data.to(self.device)
-                with torch.no_grad():
-                    if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                        loss, acc = testModel(data)
-                    else:
-                        model_output = testModel(data)
-                        loss, acc = self.loss_fn(model_output, data.y)
-                    avg_acc.append(acc.item())
-            torch.cuda.empty_cache()
-                    
-        avg_acc = np.mean(avg_acc)
-        print(f"Testing accuracy: {avg_acc:.4f}")
-        
-        return avg_acc
             

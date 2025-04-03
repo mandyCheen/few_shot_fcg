@@ -34,9 +34,9 @@ class LoadDataset:
             self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
             if self.enable_openset:
                 rawOSDatasetPath = os.path.join(opt["paths"]["data"]["csv_folder"], opt["dataset"]["openset_raw"])
-                self.rawOSDataset = pd.read_csv(rawOSDatasetPath)
+                rawOSDataset = pd.read_csv(rawOSDatasetPath)
                 self.opensetDataRatio = opt["dataset"]["openset_data_ratio"]
-                self.opensetData = self.load_openset_data(mode=opt["dataset"]["openset_data_mode"])
+                self.opensetData = self.load_openset_data(rawOSDataset=rawOSDataset, mode=opt["dataset"]["openset_data_mode"])
             else:
                 self.opensetData = None
     
@@ -135,13 +135,13 @@ class LoadDataset:
         trainData, valData = train_test_split(trainData, test_size=splitRate[2], random_state=self.seed)
         return trainData, testData, valData
     
-    def load_openset_data(self, mode: str) -> pd.DataFrame:
+    def load_openset_data(self, rawOSDataset: pd.DataFrame, mode: str) -> pd.DataFrame:
         print("Loading openset data...")
 
         if mode == "all":
-            opensetData = self.rawOSDataset
+            opensetData = rawOSDataset
         elif mode == "random":
-            opensetData = self.rawOSDataset.sample(frac=self.opensetDataRatio, random_state=self.seed)
+            opensetData = rawOSDataset.sample(frac=self.opensetDataRatio, random_state=self.seed)
             opensetData = opensetData.reset_index(drop=True)
 
         print(f"Openset data shape: {opensetData.shape}")

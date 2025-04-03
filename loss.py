@@ -547,6 +547,7 @@ class ClassifierLoss(Loss):
         
         return loss, acc
 
+from torch_geometric.data import Batch
 class LabelPropagation(nn.Module, Loss):
     """Label Propagation"""
     def __init__(self, opt: dict, encoder):
@@ -556,7 +557,8 @@ class LabelPropagation(nn.Module, Loss):
         self.device = opt["settings"]["train"]["device"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
         self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
-        self.cls_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
+        self.openset_m_samples = opt.get("settings", {}).get("openset", {}).get("test", {}).get("m_samples", 0)
+        self.cls_training_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
         self.openset_loss_scale = opt.get("settings", {}).get("openset", {}).get("train", {}).get("loss_weight", 0.5)
         self.encoder = encoder
         self.relation = GraphRelationNetwork(self.args["dim_in"], self.args["dim_hidden"], self.args["dim_out"], self.args["relation_layer"])
@@ -569,7 +571,7 @@ class LabelPropagation(nn.Module, Loss):
         elif opt['settings']['few_shot']['parameters']['rn'] == 30:    # learned sigma, learned alpha
             self.alpha = nn.Parameter(torch.tensor([opt['settings']['few_shot']['parameters']['alpha']]).to(self.device), requires_grad=True)
 
-    def forward(self, data):
+    def forward(self, data, opensetTesting=False):
         """
             inputs are preprocessed
             support:    (N_way*N_shot)x3x84x84
@@ -586,12 +588,19 @@ class LabelPropagation(nn.Module, Loss):
         edge_index = data.edge_index
         batch = data.batch
 
-        if self.enable_openset:
+        if opensetTesting: # openset testing
+            num = len(target) - self.openset_m_samples
+            closed_target = target[:num]
+            _, support_idxs, query_idxs = self.get_support_query_idxs(closed_target)
+            num_support_classes = len(torch.unique(closed_target))
+            num_open_samples = self.openset_m_samples
+            openset_idxs = torch.arange(len(target))[num:]
+        elif self.enable_openset: # openset training
             # get support and query indices
-            _, support_idxs, query_idxs, openset_idxs = self.get_support_query_idxs(target, openset=True, cls_openset=self.cls_openset)
-            num_support_classes = len(torch.unique(target)) - self.cls_openset
+            _, support_idxs, query_idxs, openset_idxs = self.get_support_query_idxs(target, openset=True, cls_openset=self.cls_training_openset)
+            num_support_classes = len(torch.unique(target)) - self.cls_training_openset
             num_open_samples = len(openset_idxs)
-        else:
+        else: # closed set training & testing
             _, support_idxs, query_idxs = self.get_support_query_idxs(target)
             num_support_classes = len(torch.unique(target))
             num_open_samples = 0
@@ -711,7 +720,7 @@ class LabelPropagation(nn.Module, Loss):
                 -torch.ones(openset_max_probs.size(0), device=self.device)
             ], dim=0)
 
-            self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=True)
+            self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=False)
 
         return loss, acc
     

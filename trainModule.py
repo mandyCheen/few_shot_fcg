@@ -4,9 +4,10 @@ from tqdm import tqdm
 import torch
 from torch_geometric.data import Data, Batch
 from loadDataset import LoadDataset
-from dataset import FcgSampler
+from dataset import FcgSampler, OpenSetFcgSampler
 from models import GraphSAGE, GCN, GraphSAGELayer
-from torch_geometric.loader import DataLoader # !
+from torch_geometric.loader import DataLoader
+from torch.utils.data import ConcatDataset
 from loss import *
 from datetime import datetime
 from train_utils import Training, Testing, load_GE_data
@@ -40,6 +41,7 @@ class TrainModule(Training):
         self.query_shots_test = opt["settings"]["few_shot"]["test"]["query_shots"]
         self.class_per_iter_test = opt["settings"]["few_shot"]["test"]["class_per_iter"]
         
+        self.enable_openset = dataset.enable_openset
         if self.enable_openset:
             self.openset_m_samples = opt["settings"]["openset"]["train"]["m_samples"]
             self.openset_class_per_iter = opt["settings"]["openset"]["train"]["class_per_iter"]
@@ -218,16 +220,32 @@ class TrainModule(Training):
         if self.lr_scheduler:
             self.get_lr_scheduler()
 
+        #TODO: create load_weights function
+
         info = self.opt["settings"]["model"]
         if info["load_weights"]:
             model_path = os.path.abspath(info["load_weights"])
             checkpoint = torch.load(model_path, map_location=self.device)
             self.model.load_state_dict(checkpoint["model_state_dict"], strict=True)
             self.optim.load_state_dict(checkpoint["optimizer_state_dict"])
+            # 將優化器狀態移動到正確的設備
+            for param_group in self.optim.param_groups:
+                for param in param_group['params']:
+                    # 確保參數在正確的設備上
+                    if param.device != self.device:
+                        param.data = param.data.to(self.device)
+                        if param.grad is not None:
+                            param.grad.data = param.grad.data.to(self.device)
+            
+            # 將優化器內部狀態移動到正確的設備
+            for state in self.optim.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(self.device)
             if self.scheduler:
                 self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+            self.model = self.model.to(self.device)
             print(f"Model loaded from {model_path}")
-            self.model.train()
             record_log(self.log_file, f"Model loaded from {model_path}\n")
         
         print(f"Model: {self.model}")
@@ -270,6 +288,7 @@ class TestModule(Testing):
 
         self.support_shots_test = opt["settings"]["few_shot"]["test"]["support_shots"]
         self.query_shots_test = opt["settings"]["few_shot"]["test"]["query_shots"]
+        self.openset_m_samples = opt["settings"]["openset"]["test"]["m_samples"] if dataset.enable_openset else 0
         self.class_per_iter_test = opt["settings"]["few_shot"]["test"]["class_per_iter"]
 
         self.iterations = opt["settings"]["train"]["iterations"]
@@ -312,16 +331,10 @@ class TestModule(Testing):
     
     def setting(self):
         print("Setting up the testing module...")
-        print(f"Loading data from {self.embeddingFolder}...")
-    
-        print("Loading testing data...")
         testGraph, label = load_GE_data(self.testDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "testData.pkl"))
-        sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
-        self.testLoader = DataLoader(testGraph, batch_sampler=sampler, num_workers=4, collate_fn=collate_graphs)    
-        
-        print("Loading openset data...")
-        
+        print(f"Loading data from {self.embeddingFolder}...")
         if self.opensetData is not None:
+            print("Generating open set testing data...")
             print("Loading openset data...")
             if self.opt["dataset"]["openset_data_mode"] == "random":
                 ratio = self.opt["dataset"]["openset_data_ratio"]
@@ -330,9 +343,18 @@ class TestModule(Testing):
             else:
                 opensetPklName = "opensetData.pkl"
                 info = ""
-            opensetGraph, label = load_GE_data(self.opensetData, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, opensetPklName), openset=True, opensetInfo=info)
-            self.opensetLoader = DataLoader(opensetGraph, batch_size=20, shuffle=True, num_workers=4, collate_fn=collate_graphs)
-        
+            opensetGraph, _ = load_GE_data(self.opensetData, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, opensetPklName), openset=True, opensetInfo=info)
+            # self.opensetLoader = DataLoader(opensetGraph, batch_size=20, shuffle=True, num_workers=4, collate_fn=collate_graphs)
+            
+            opensetSampler = OpenSetFcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations, opensetGraph, self.openset_m_samples)
+            self.opensetTestLoader = DataLoader(ConcatDataset([testGraph, opensetGraph]), batch_sampler=opensetSampler, num_workers=4, collate_fn=collate_graphs)    
+        else:
+
+            print("Generating closed set testing data...")
+            print("Loading testing data...")
+            sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
+            self.testLoader = DataLoader(testGraph, batch_sampler=sampler, num_workers=4, collate_fn=collate_graphs)    
+
         self.generate_model()
         self.get_loss_fn()
         
@@ -347,7 +369,16 @@ class TestModule(Testing):
         print(f"Model loaded from {model_path}")
         self.model = self.model.to(self.device)
     
-    def eval(self, model_path: str = None):
+    def eval(self, model_path: str = None, mode: str = "closedset"):
+
+        """
+        Evaluate the model on the test dataset.
+        Args:
+            model_path (str): Path to the model file. If None, the best model will be used.
+            mode (str): Evaluation mode, either "closedset" or "openset".
+        """
+
+        assert(mode == "closedset" or mode == "openset", "Mode not supported")
         
         if model_path is None:
             print("Model path is not provided. Using the best model...")
@@ -355,57 +386,47 @@ class TestModule(Testing):
             
         evalFolder = os.path.dirname(model_path)
         logFolder = os.path.dirname(self.model_folder)
+        
+        if mode == "closedset":
+            assert(self.loss_fn.enable_openset == False, "Open set evaluation is not supported in this mode")
 
-        print("Record evaluation log...")
-        evalLogPath = os.path.join(logFolder, "evalLog.csv")
-        if not os.path.exists(evalLogPath):
-            with open(evalLogPath, "w") as f:
-                f.write("timestamp, folderName, model, test_acc\n")
+            print("Record evaluation log...")
+            evalLogPath = os.path.join(logFolder, "evalLog.csv")
+            if not os.path.exists(evalLogPath):
+                with open(evalLogPath, "w") as f:
+                    f.write("timestamp, folderName, model, test_acc\n")
+        else: # "openset"
+            assert(self.loss_fn.enable_openset == True, "You need to enable openset in the model") 
+            assert(self.opensetTestLoader is not None, "You need to load openset data")
+            
+            print("Record evaluation log...")
+            evalLogPath = os.path.join(logFolder, "evalLog_openset.csv")
+            if not os.path.exists(evalLogPath):
+                with open(evalLogPath, "w") as f:
+                    f.write("timestamp, folderName, model, closedset_test_acc, openset_auroc \n")
     
         print(f"Loading model from {model_path}")
-
         self.model.load_state_dict(torch.load(model_path, map_location=self.device)["model_state_dict"])
-        print("Best model loaded")
         self.model = self.model.to(self.device)
         
         print(f"Model: {self.model}")
-        print("Start evaluation... (testing dataset)")
-        testAcc = self.testing(self.model, self.testLoader)
+        print(f"Start evaluation... (testing dataset / {mode} dataset)")
+        if mode == "closedset": 
+            testAcc = self.testing(self.model, self.testLoader)
+        else:
+            testAcc = self.testing(self.model, self.opensetTestLoader, True)
 
-        with open(evalLogPath, "a") as f:
-            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}\n")
+        if mode == "closedset":
+            print(f"Closed set test accuracy: {testAcc}")
+            with open(evalLogPath, "a") as f:
+                f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}\n")
+        else:
+            print(f"Closed set test accuracy: {testAcc}")
+            print(f"Open set AUROC: {self.model.openset_auroc}")
+            with open(evalLogPath, "a") as f:
+                f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {self.model.openset_auroc}\n")
             
         print("Finish evaluation")
-
-    def openset_eval(self, model_path: str = None):
-        if model_path is None:
-            print("Model path is not provided. Using the best model...")
-            model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
-        
-        evalFolder = os.path.dirname(model_path)
-        logFolder = os.path.dirname(self.model_folder)
-
-        print("Record evaluation log...")
-        evalLogPath = os.path.join(logFolder, "evalLog.csv")
-        if not os.path.exists(evalLogPath):
-            with open(evalLogPath, "w") as f:
-                f.write("timestamp, folderName, model, test_acc, openset_auroc \n")
-
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device)["model_state_dict"])
-        print("Best model loaded")
-        self.model = self.model.to(self.device)
-        
-        print(f"Model: {self.model}")
-        print("Start evaluation... (openset dataset)")
-
-        testAcc = self.openset_testing(self.model, self.testLoader)
-
-        with open(evalLogPath, "a") as f:
-            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {self.model.openset_auroc}\n")
-            
-        print("Finish evaluation")
-
-
 
     def eval_ablation(self, model_path: str = None): ## Just eval ablation part
         if model_path is None:
@@ -427,6 +448,7 @@ class TestModule(Testing):
             self.pretrainModel.load_state_dict(torch.load(pretrainModelPath, map_location=self.device)["model_state_dict"], strict=False)
         else:
             pretrainModelPath = "None"
+
         print(f"Ablation evaluation... (testing dataset)")
         self.pretrainModel = self.pretrainModel.to(self.device)
         
