@@ -24,6 +24,7 @@ class TrainModule(Training):
         self.trainDataset = dataset.trainData
         self.valDataset = dataset.valData
         self.testDataset = dataset.testData
+        self.opensetData = dataset.opensetData
         self.trainGraph = []
         self.valGraph = []
         self.testGraph = []
@@ -204,11 +205,25 @@ class TrainModule(Training):
             print("Loading validation data...")
             self.valGraph, label =load_GE_data(self.valDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "valData.pkl"))
             if self.enable_openset:
-                assert(self.openset_m_samples <= self.support_shots_train + self.query_shots_train)
-                val_sampler = FcgSampler(label, self.support_shots_train + self.query_shots_train, self.class_per_iter_train + self.openset_class_per_iter, self.iterations)
+                assert(self.opensetData is not None)
+                print("Generating open set testing data...")
+                print("Loading openset data...")
+                #TODO: add openset data for validation
+                if self.opt["dataset"]["openset_data_mode"] == "random":
+                    ratio = self.opt["dataset"]["openset_data_ratio"]
+                    opensetPklName = f"opensetData_random_{ratio}.pkl"
+                    info = f"random_{ratio}"
+                else:
+                    opensetPklName = "opensetData.pkl"
+                    info = ""
+                opensetGraph, _ = load_GE_data(self.opensetData, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, opensetPklName), openset=True, opensetInfo=info)
+                # self.opensetLoader = DataLoader(opensetGraph, batch_size=20, shuffle=True, num_workers=4, collate_fn=collate_graphs)
+                
+                opensetSampler = OpenSetFcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations, opensetGraph, self.openset_m_samples)
+                self.valLoader = DataLoader(ConcatDataset([self.valGraph, opensetGraph]), batch_sampler=opensetSampler, num_workers=4, collate_fn=collate_graphs)    
             else:
                 val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
-            self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4, collate_fn=collate_graphs)
+                self.valLoader = DataLoader(self.valGraph, batch_sampler=val_sampler, num_workers=4, collate_fn=collate_graphs)
         else:
             self.valLoader = None
 
@@ -275,16 +290,17 @@ class TrainModule(Training):
 
             
 class TestModule(Testing):
-    def __init__(self, configPath: str, dataset: LoadDataset, opt: dict = None):
+    def __init__(self, configPath: str, dataset: LoadDataset):
         
         # opt = load_config(configPath)
         self.model_folder = os.path.dirname(configPath)
+        opt = load_config(configPath)
+        self.opt = opt
         self.embeddingFolder = os.path.join(opt["paths"]["data"]["embedding_folder"], dataset.datasetName, opt["settings"]["vectorize"]["node_embedding_method"])
         self.testDataset = dataset.testData
         self.valDataset = dataset.valData
         self.opensetData = dataset.opensetData
         self.loss_fn = None
-        self.opt = opt
 
         self.support_shots_test = opt["settings"]["few_shot"]["test"]["support_shots"]
         self.query_shots_test = opt["settings"]["few_shot"]["test"]["query_shots"]
@@ -414,17 +430,18 @@ class TestModule(Testing):
         if mode == "closedset": 
             testAcc = self.testing(self.model, self.testLoader)
         else:
-            testAcc = self.testing(self.model, self.opensetTestLoader, True)
+            testAcc, testAuc = self.testing(self.model, self.opensetTestLoader, True)
 
+        folder_name = self.opt["settings"]["name"] + "_" + os.path.basename(evalFolder).split("_")[-2] + "_" + os.path.basename(evalFolder).split("_")[-1]
         if mode == "closedset":
             print(f"Closed set test accuracy: {testAcc}")
             with open(evalLogPath, "a") as f:
                 f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}\n")
         else:
             print(f"Closed set test accuracy: {testAcc}")
-            print(f"Open set AUROC: {self.model.openset_auroc}")
+            print(f"Open set AUROC: {testAuc}")
             with open(evalLogPath, "a") as f:
-                f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {self.model.openset_auroc}\n")
+                f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {testAuc}\n")
             
         print("Finish evaluation")
 

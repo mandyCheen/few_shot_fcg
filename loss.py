@@ -661,7 +661,6 @@ class LabelPropagation(nn.Module, Loss):
             mask = mask.scatter(1, indices, 1)
             mask = ((mask + torch.t(mask)) > 0).type(torch.float32)
             W = W * mask
-
         # 正規化
         D = W.sum(0)
         D_sqrt_inv = torch.sqrt(1.0 / (D + eps))
@@ -710,7 +709,14 @@ class LabelPropagation(nn.Module, Loss):
             open_loss = -entropy_loss
             loss = loss + self.openset_loss_scale * open_loss
 
-            # claculate open set auroc
+            # # claculate open set auroc
+            # temp_log = "./temp_log.txt"
+            # with open(temp_log, "a") as f:
+            #     f.write("Fq:\n")
+            #     f.write(f"{Fq}\n")
+            #     f.write("Fo:\n")
+            #     f.write(f"{Fo}\n")
+
             query_max_probs = F.softmax(Fq, dim=1).max(dim=1)[0]
             openset_max_probs = F.softmax(Fo, dim=1).max(dim=1)[0]
 
@@ -721,6 +727,18 @@ class LabelPropagation(nn.Module, Loss):
             ], dim=0)
 
             self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=False)
+            # with open(temp_log, "a") as f:
+            #     f.write("ROC Area:\n")
+            #     f.write(f"{self.openset_auroc}\n")
+            #     f.write("all_scores:\n")
+            #     all_scores = all_scores.cpu().numpy()
+            #     all_scores_str = "\n".join([str(x.item()) for x in all_scores])
+            #     f.write(all_scores_str)
+            #     f.write("labels:\n")
+            #     closed_labels = closed_labels.cpu().numpy()
+            #     closed_labels_str = "\n".join([str(x.item()) for x in closed_labels])
+            #     f.write(closed_labels_str)
+            #     f.write("\n")
 
         return loss, acc
     

@@ -189,8 +189,10 @@ class Training:
             self.model.train()
             train_acc = []
             train_loss = []
+            train_auc = []
             val_acc = []
             val_loss = []
+            val_auc = []
             with tqdm(self.trainLoader, desc=f"Epoch {epoch+1}/{self.epochs} (Training)") as pbar:
                 for data in pbar:
                     data = data.to(self.device)
@@ -202,17 +204,21 @@ class Training:
                         loss, acc = self.loss_fn(predicts, data.y)        
                     loss.backward()
                     self.optim.step()   
-                    
                     self.train_acc_history.append(acc.item())
                     # Update progress bar with current batch metrics
                     pbar.set_postfix({
                         'loss': f'{loss.item():.4f}',
                         'acc': f'{acc.item():.4f}',
+                        'openset_auc': f'{self.model.openset_auroc:.4f}' if self.enable_openset else 'N/A'
                     })
                     train_loss.append(loss.item())
                     train_acc.append(acc.item()) 
+                    if self.enable_openset:
+                        train_auc.append(self.model.openset_auroc)
                 avg_loss = np.mean(train_loss)
                 avg_acc = np.mean(train_acc)
+                if self.enable_openset:
+                    avg_auc = np.mean(train_auc)
                 postfix = ' (Best)' if avg_acc >= best_train_acc else f' (Best: {best_train_acc:.4f})'
                 # postfix = ' (Lowest)' if avg_loss <= lowest_train_loss else f' (Lowest: {lowest_train_loss:.4f})'
                 content = f'Avg Train Loss: {avg_loss:.4f}, Avg Train Acc: {avg_acc:.4f}{postfix}'
@@ -224,7 +230,7 @@ class Training:
                 print(content)
                 record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
                 if self.enable_openset:
-                    record_log(self.log_file, 'Open-Set AUROC: {:.4f}\n'.format(self.model.openset_auroc))
+                    record_log(self.log_file, 'Open-Set AUROC: {:.4f}\n'.format(avg_auc))
 
             if self.valLoader is not None: 
                 self.model.eval()                
@@ -233,7 +239,7 @@ class Training:
                         data = data.to(self.device)
                         with torch.no_grad():
                             if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                                loss, acc = self.model(data)
+                                loss, acc = self.model(data, opensetTesting=self.enable_openset)
                             else:
                                 model_output = self.model(data)
                                 loss, acc = self.loss_fn(model_output, data.y)
@@ -244,9 +250,12 @@ class Training:
                         pbar.set_postfix({
                             'loss': f'{loss.item():.4f}',
                             'acc': f'{acc.item():.4f}',
+                            'openset_auc': f'{self.model.openset_auroc:.4f}' if self.enable_openset else 'N/A'
                         })
                     avg_loss = np.mean(val_loss)
                     avg_acc = np.mean(val_acc)
+                    if self.enable_openset:
+                        avg_auc = np.mean(val_auc)
                     postfix = ' (Best)' if avg_acc >= best_val_acc else f' (Best: {best_val_acc:.4f})'
                     # postfix = ' (Lowest)' if avg_loss <= lowest_val_loss else f' (Lowest: {lowest_val_loss:.4f})'
                     content = f'Avg Val Loss: {avg_loss:.4f}, Avg Val Acc: {avg_acc:.4f}{postfix}'
@@ -254,7 +263,7 @@ class Training:
                     print(content)
                     record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
                     if self.enable_openset:
-                        record_log(self.log_file, 'Open-Set AUROC: {:.4f}\n'.format(self.model.openset_auroc))
+                        record_log(self.log_file, 'Open-Set AUROC: {:.4f}\n'.format(avg_auc))
                     best_val_acc, patience, stop = self.end_of_epoch(avg_acc, best_val_acc, epoch, patience, avg_loss)
                     # lowest_val_loss, patience, stop = self.end_of_epoch_loss(avg_loss, lowest_val_loss, epoch, patience)
             else:
@@ -354,6 +363,7 @@ class Testing:
     
     def testing(self, testModel, testLoader, openset=False):
         avg_acc = list()
+        avg_auc = list()
         for epoch in range(10):
             print(f"Epoch {epoch+1}")
             for data in tqdm(testLoader, desc="Testing"):
@@ -367,11 +377,17 @@ class Testing:
                         model_output = testModel(data)
                         loss, acc = self.loss_fn(model_output, data.y)
                     avg_acc.append(acc.item())
+                    if openset:
+                        avg_auc.append(testModel.openset_auroc)
             torch.cuda.empty_cache()
                     
         avg_acc = np.mean(avg_acc)
-        print(f"Testing accuracy: {avg_acc:.4f}")
-        
-        return avg_acc
+        if openset:
+            avg_auc = np.mean(avg_auc)
+            print(f"Testing accuracy: {avg_acc:.4f}, OpenSet AUROC: {avg_auc:.4f}")
+            return avg_acc, avg_auc
+        else:
+            print(f"Testing accuracy: {avg_acc:.4f}")
+            return avg_acc
 
             

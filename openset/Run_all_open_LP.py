@@ -8,8 +8,8 @@ from trainModule import TestModule
 
 warnings.filterwarnings("ignore")
 
-expList = ["5way_5shot", "5way_10shot"] #, "10way_5shot", "10way_10shot"
-seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
+expList = ["10way_5shot", "10way_10shot"] #, "5way_5shot", "5way_10shot"
+seeds = [31, 42, 888] #6, 7, 10, 666, 11, 19, 22, 
 alpha = 0.7
 
 for seed in seeds:
@@ -49,5 +49,5 @@ for seed in seeds:
         trainModule = TrainModule(options, dataset)
         trainModule.train()
 
-        test = TestModule(os.path.join(trainModule.model_folder, "config.json"), dataset, options)
+        test = TestModule(os.path.join(trainModule.model_folder, "config.json"), dataset)
         test.eval(mode="openset")
