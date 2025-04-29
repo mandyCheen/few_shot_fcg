@@ -431,17 +431,19 @@ class TestModule(Testing):
             testAcc = self.testing(self.model, self.testLoader)
         else:
             testAcc, testAuc = self.testing(self.model, self.opensetTestLoader, True)
-
-        folder_name = self.opt["settings"]["name"] + "_" + os.path.basename(evalFolder).split("_")[-2] + "_" + os.path.basename(evalFolder).split("_")[-1]
+        if os.path.basename(evalFolder).split("_")[0] == "10way" and self.opt["settings"]["few_shot"]["test"]["class_per_iter"] == 5:
+            folder_name = os.path.basename(evalFolder) + "_test_in_5way"
+        else:
+            folder_name = os.path.basename(evalFolder)
         if mode == "closedset":
             print(f"Closed set test accuracy: {testAcc}")
             with open(evalLogPath, "a") as f:
-                f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}\n")
+                f.write(f"{datetime.now()}, {folder_name}, {os.path.basename(model_path)}, {testAcc}\n")
         else:
             print(f"Closed set test accuracy: {testAcc}")
             print(f"Open set AUROC: {testAuc}")
             with open(evalLogPath, "a") as f:
-                f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(model_path)}, {testAcc}, {testAuc}\n")
+                f.write(f"{datetime.now()}, {folder_name}, {os.path.basename(model_path)}, {testAcc}, {testAuc}\n")
             
         print("Finish evaluation")
 
@@ -470,8 +472,9 @@ class TestModule(Testing):
         self.pretrainModel = self.pretrainModel.to(self.device)
         
         testAccPretrain = self.testing(self.pretrainModel, self.testLoader)
-
+        if os.path.basename(evalFolder).split("_")[0] == "10way" and self.opt["settings"]["few_shot"]["test"]["class_per_iter"] == 5:
+            folder_name = os.path.basename(evalFolder) + "_test_in_5way"
         with open(evalLogPath, "a") as f:
-            f.write(f"{datetime.now()}, {os.path.basename(evalFolder)}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}\n")
+            f.write(f"{datetime.now()}, {folder_name}, {os.path.basename(pretrainModelPath)}, {testAccPretrain}\n")
             
         print("Finish evaluation")

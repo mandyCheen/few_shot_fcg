@@ -373,12 +373,14 @@ class Testing:
                 with torch.no_grad():
                     if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
                         loss, acc = testModel(data, opensetTesting=openset)
+                        if openset:
+                            avg_auc.append(testModel.openset_auroc)
                     else:
                         model_output = testModel(data)
                         loss, acc = self.loss_fn(model_output, data.y)
+                        if openset:
+                            avg_auc.append(self.loss_fn.openset_auroc)
                     avg_acc.append(acc.item())
-                    if openset:
-                        avg_auc.append(testModel.openset_auroc)
             torch.cuda.empty_cache()
                     
         avg_acc = np.mean(avg_acc)

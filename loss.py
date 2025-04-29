@@ -17,6 +17,12 @@ class LossFunction:
     @staticmethod
     def compute(dists, n_classes, n_query):
         raise NotImplementedError
+    @staticmethod
+    def compute(dists, n_classes, n_query, negative_distance=False):
+        raise NotImplementedError
+    @staticmethod
+    def compute(matrix, dim):
+        raise NotImplementedError
 
 class EuclideanDistance(DistanceMetric):
     @staticmethod
@@ -133,6 +139,30 @@ class CrossEntropyLoss(LossFunction):
         acc_val = y_hat.eq(target_inds.squeeze(2)).float().mean()
         
         return loss_val, acc_val
+    
+class EntropyLoss(LossFunction):
+    """熵損失計算類"""
+
+    @staticmethod
+    def compute(matrix, dim):
+        """
+        計算熵損失
+        
+        Args:
+            matrix: 輸入矩陣
+            dim: 計算熵的維度
+            
+        Returns:
+            torch.Tensor: 熵損失值
+        """
+        # 計算每行的softmax
+        probs = F.softmax(matrix, dim=dim)
+        log_probs = F.log_softmax(matrix, dim=dim)
+        
+        entropy_loss = -torch.sum(probs * log_probs, dim=dim).mean()
+
+        return entropy_loss
+        
 
 DISTANCE_METRICS = {
     'euclidean': EuclideanDistance,
@@ -348,6 +378,11 @@ class ProtoLoss(Loss):
         self.metric_name = opt["settings"]["train"]["distance"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
         self.loss_fn_name = opt["settings"]["train"]["loss"]
+
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
+        self.openset_m_samples = opt.get("settings", {}).get("openset", {}).get("test", {}).get("m_samples", 0)
+        self.cls_training_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
+        self.openset_loss_scale = opt.get("settings", {}).get("openset", {}).get("train", {}).get("loss_weight", 0.5)
         
         if self.metric_name not in DISTANCE_METRICS:
             raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
@@ -359,10 +394,11 @@ class ProtoLoss(Loss):
         
         self.distance_metric = DISTANCE_METRICS[self.metric_name]
         self.loss_fn = LOSS_FUNCTIONS[self.loss_fn_name]
+        self.opensetLoss = EntropyLoss()
         
         super().__init__(self.n_support)
 
-    def __call__(self, input, target):
+    def __call__(self, input, target, opensetTesting=False):
         """
         計算Prototypical Networks的損失值和準確率
         
@@ -376,10 +412,26 @@ class ProtoLoss(Loss):
         # 移到CPU進行計算（可根據需要修改）
         target_cpu = target.cpu()
         input_cpu = input.cpu()
-        # 獲取support和query的索引
-        classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
-        n_classes = len(classes)
-        n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+
+        if opensetTesting: # openset testing
+            num = len(target) - self.openset_m_samples
+            closed_target = target[:num]
+            classes, support_idxs, query_idxs = self.get_support_query_idxs(closed_target)
+            n_classes = len(torch.unique(closed_target))
+            num_open_samples = self.openset_m_samples
+            openset_idxs = torch.arange(len(target))[num:]
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        elif self.enable_openset: # openset training
+            # get support and query indices
+            classes, support_idxs, query_idxs, openset_idxs = self.get_support_query_idxs(target, openset=True, cls_openset=self.cls_training_openset)
+            n_classes = len(torch.unique(target)) - self.cls_training_openset
+            num_open_samples = len(openset_idxs)
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        else: # closed set training & testing
+            classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
+            n_classes = len(classes)
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+            num_open_samples = 0
         
         # 計算原型
         prototypes = self.compute_prototypes(input_cpu, support_idxs)
@@ -391,10 +443,38 @@ class ProtoLoss(Loss):
 
         if self.metric_name == 'cosine_similarity':
             # 計算損失和準確率
-            return self.loss_fn.compute(dists, n_classes, n_query)
+            loss, acc = self.loss_fn.compute(dists, n_classes, n_query)
         else:
             # 計算損失和準確率
-            return self.loss_fn.compute(dists, n_classes, n_query, negative_distance=True)
+            loss, acc = self.loss_fn.compute(dists, n_classes, n_query, negative_distance=True)
+        # openset
+        if self.enable_openset and num_open_samples > 0:
+            openset_samples = input_cpu[openset_idxs]
+            openset_dists = self.distance_metric.compute(openset_samples, prototypes)
+            openset_logits = -openset_dists.view(n_classes, num_open_samples, -1)
+            query_logits = -dists.view(n_classes, n_query, -1)
+
+            if self.metric_name == 'cosine_similarity':
+                openset_logits = -openset_logits
+                query_logits = -query_logits
+
+            entropy_loss = self.opensetLoss.compute(openset_logits, dim=2)
+            open_loss = -entropy_loss
+
+            loss = loss + self.openset_loss_scale * open_loss
+
+            query_max_probs = F.softmax(query_logits, dim=2).max(dim=2)[0]
+            openset_max_probs = F.softmax(openset_logits, dim=2).max(dim=2)[0]
+
+            all_scores = torch.cat([query_max_probs, openset_max_probs], dim=0)
+            closed_labels = torch.cat([
+                torch.ones(query_max_probs.size(0), device=self.device),
+                -torch.ones(openset_max_probs.size(0), device=self.device)
+            ], dim=0)
+
+            self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=False)
+             
+        return loss, acc
 
     def get_metric_name(self):
         """返回當前使用的距離度量方法名稱"""
@@ -409,6 +489,11 @@ class NnLoss(Loss):
         self.metric_name = opt["settings"]["train"]["distance"]
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
         self.loss_fn_name = opt["settings"]["train"]["loss"]
+
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
+        self.openset_m_samples = opt.get("settings", {}).get("openset", {}).get("test", {}).get("m_samples", 0)
+        self.cls_training_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
+        self.openset_loss_scale = opt.get("settings", {}).get("openset", {}).get("train", {}).get("loss_weight", 0.5)
             
         if self.metric_name not in DISTANCE_METRICS:
             raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
@@ -419,16 +504,33 @@ class NnLoss(Loss):
         
         self.distance_metric = DISTANCE_METRICS[self.metric_name]
         self.loss_fn = LOSS_FUNCTIONS[self.loss_fn_name]
+        self.opensetLoss = EntropyLoss()
         
         super().__init__(self.n_support)
     
-    def __call__(self, input, target):
+    def __call__(self, input, target, opensetTesting=False):
         target_cpu = target.cpu()
         input_cpu = input.cpu()
-        
-        classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
-        n_classes = len(classes)
-        n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+
+        if opensetTesting: # openset testing
+            num = len(target) - self.openset_m_samples
+            closed_target = target[:num]
+            classes, support_idxs, query_idxs = self.get_support_query_idxs(closed_target)
+            n_classes = len(torch.unique(closed_target))
+            num_open_samples = self.openset_m_samples
+            openset_idxs = torch.arange(len(target))[num:]
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        elif self.enable_openset: # openset training
+            # get support and query indices
+            classes, support_idxs, query_idxs, openset_idxs = self.get_support_query_idxs(target, openset=True, cls_openset=self.cls_training_openset)
+            n_classes = len(torch.unique(target)) - self.cls_training_openset
+            num_open_samples = len(openset_idxs)
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        else: # closed set training & testing
+            classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
+            n_classes = len(classes)
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+            num_open_samples = 0
         
         nn_points = self.get_nn_points(input_cpu, support_idxs)
         
@@ -441,9 +543,43 @@ class NnLoss(Loss):
         min_dists, _ = dists_by_class.min(dim=2)
         
         if self.metric_name == 'cosine_similarity':
-            return self.loss_fn.compute(min_dists, n_classes, n_query)
+            loss, acc = self.loss_fn.compute(min_dists, n_classes, n_query)
         else:
-            return self.loss_fn.compute(min_dists, n_classes, n_query, negative_distance=True)
+            loss, acc = self.loss_fn.compute(min_dists, n_classes, n_query, negative_distance=True)
+
+        # openset
+        if self.enable_openset and num_open_samples > 0:
+            openset_samples = input_cpu[openset_idxs]
+            openset_dists = self.distance_metric.compute(openset_samples, nn_points)
+
+            # find the nearest neighbor for each query point
+            openset_dists_by_class = openset_dists.view(num_open_samples, n_classes, self.n_support)
+            openset_min_dists, _ = openset_dists_by_class.min(dim=2)
+
+            openset_logits = -openset_min_dists.view(n_classes, num_open_samples, -1)
+            query_logits = -min_dists.view(n_classes, n_query, -1)
+
+            if self.metric_name == 'cosine_similarity':
+                openset_logits = -openset_logits
+                query_logits = -query_logits
+            
+            entropy_loss = self.opensetLoss.compute(openset_logits, dim=2)
+            open_loss = -entropy_loss
+
+            loss = loss + self.openset_loss_scale * open_loss
+
+            query_max_probs = F.softmax(query_logits, dim=2).max(dim=2)[0]
+            openset_max_probs = F.softmax(openset_logits, dim=2).max(dim=2)[0]
+
+            all_scores = torch.cat([query_max_probs, openset_max_probs], dim=0)
+            closed_labels = torch.cat([
+                torch.ones(query_max_probs.size(0), device=self.device),
+                -torch.ones(openset_max_probs.size(0), device=self.device)
+            ], dim=0)
+
+            self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=False)
+             
+        return loss, acc 
     
     def get_metric_name(self):
         return self.metric_name
@@ -457,6 +593,12 @@ class SoftNnLoss(Loss):
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
         self.loss_fn_name = opt["settings"]["train"]["loss"]
         
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
+        self.openset_m_samples = opt.get("settings", {}).get("openset", {}).get("test", {}).get("m_samples", 0)
+        self.cls_training_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
+        self.openset_loss_scale = opt.get("settings", {}).get("openset", {}).get("train", {}).get("loss_weight", 0.5)
+            
+
         if self.metric_name not in DISTANCE_METRICS:
             raise ValueError(f"Unsupported distance metric: {self.metric_name}. "
                         f"Supported metrics are: {list(DISTANCE_METRICS.keys())}")
@@ -466,6 +608,7 @@ class SoftNnLoss(Loss):
         
         self.distance_metric = DISTANCE_METRICS[self.metric_name]
         self.loss_fn = LOSS_FUNCTIONS[self.loss_fn_name]
+        self.opensetLoss = EntropyLoss()
         
         super().__init__(self.n_support)
     def __call__(self, input, target):
@@ -480,11 +623,28 @@ class SoftNnLoss(Loss):
             tuple: (loss_value, accuracy_value)
         """
         target_cpu = target.cpu()
-        input_cpu = input.cpu()        
+        input_cpu = input.cpu()       
 
-        classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
-        n_classes = len(classes)
-        n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        if opensetTesting: # openset testing
+            num = len(target) - self.openset_m_samples
+            closed_target = target[:num]
+            classes, support_idxs, query_idxs = self.get_support_query_idxs(closed_target)
+            n_classes = len(torch.unique(closed_target))
+            num_open_samples = self.openset_m_samples
+            openset_idxs = torch.arange(len(target))[num:]
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        elif self.enable_openset: # openset training
+            # get support and query indices
+            classes, support_idxs, query_idxs, openset_idxs = self.get_support_query_idxs(target, openset=True, cls_openset=self.cls_training_openset)
+            n_classes = len(torch.unique(target)) - self.cls_training_openset
+            num_open_samples = len(openset_idxs)
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+        else: # closed set training & testing
+            classes, support_idxs, query_idxs = self.get_support_query_idxs(target_cpu)
+            n_classes = len(classes)
+            n_query = target_cpu.eq(classes[0].item()).sum().item() - self.n_support
+            num_open_samples = 0
+         
         
         # Get support points 
         nn_points = self.get_nn_points(input_cpu, support_idxs)
@@ -500,22 +660,56 @@ class SoftNnLoss(Loss):
         
         # For each query point, compute soft weights for all support samples
         if self.metric_name == 'cosine_similarity':
-            # For cosine similarity, larger values = more similar
             weights = F.softmax(dists_by_class, dim=-1)
-            # Weight and sum the raw similarities
-            weighted_dists = (weights * dists_by_class).sum(dim=2)
         else:
-            # For distance metrics, smaller values = more similar
-            # So we use negative distances for the softmax
             weights = F.softmax(-dists_by_class, dim=-1) 
-            # Weight and sum the distances
-            weighted_dists = (weights * dists_by_class).sum(dim=2)
+
+        weighted_dists = (weights * dists_by_class).sum(dim=2)
             
         # Compute loss and accuracy using weighted distances
         if self.metric_name == 'cosine_similarity':
-            return self.loss_fn.compute(weighted_dists, n_classes, n_query)
+            loss, acc = self.loss_fn.compute(weighted_dists, n_classes, n_query)
         else:
-            return self.loss_fn.compute(weighted_dists, n_classes, n_query, negative_distance=True)
+            loss, acc = self.loss_fn.compute(weighted_dists, n_classes, n_query, negative_distance=True)
+
+        # openset
+        if self.enable_openset and num_open_samples > 0:
+            openset_samples = input_cpu[openset_idxs]
+            openset_dists = self.distance_metric.compute(openset_samples, nn_points)
+
+            # find the nearest neighbor for each query point
+            openset_dists_by_class = openset_dists.view(num_open_samples, n_classes, self.n_support)
+            if self.metric_name == 'cosine_similarity':
+                openset_weights = F.softmax(openset_dists_by_class, dim=-1)
+            else:
+                openset_weights = F.softmax(-openset_dists_by_class, dim=-1)
+
+            openset_weighted_dists = (openset_weights * openset_dists_by_class).sum(dim=2)
+
+            openset_logits = -openset_weighted_dists.view(n_classes, num_open_samples, -1)
+            query_logits = -weighted_dists.view(n_classes, n_query, -1)
+
+            if self.metric_name == 'cosine_similarity':
+                openset_logits = -openset_logits
+                query_logits = -query_logits
+            
+            entropy_loss = self.opensetLoss.compute(openset_logits, dim=2)
+            open_loss = -entropy_loss
+
+            loss = loss + self.openset_loss_scale * open_loss
+
+            query_max_probs = F.softmax(query_logits, dim=2).max(dim=2)[0]
+            openset_max_probs = F.softmax(openset_logits, dim=2).max(dim=2)[0]
+
+            all_scores = torch.cat([query_max_probs, openset_max_probs], dim=0)
+            closed_labels = torch.cat([
+                torch.ones(query_max_probs.size(0), device=self.device),
+                -torch.ones(openset_max_probs.size(0), device=self.device)
+            ], dim=0)
+
+            self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=False)
+             
+        return loss, acc 
 
 class ClassifierLoss(Loss):
     def __init__(self, opt: dict):
@@ -565,6 +759,7 @@ class LabelPropagation(nn.Module, Loss):
 
         self.metric_name = opt["settings"]["train"]["distance"]
         self.distance_metric = DISTANCE_METRICS[self.metric_name]
+        self.opensetLoss = EntropyLoss()
         
         if opt['settings']['few_shot']['parameters']['rn'] == 300:   # learned sigma, fixed alpha
             self.alpha = torch.tensor([opt['settings']['few_shot']['parameters']['alpha']], requires_grad=False).to(self.device)
@@ -702,9 +897,11 @@ class LabelPropagation(nn.Module, Loss):
         acc = 1.0 * correct.float() / float(total)
 
         if self.enable_openset and num_open_samples > 0:
-            prob_open = F.softmax(Fo, dim=1)
-            log_prob_open = F.log_softmax(Fo, dim=1)
-            entropy_loss = -(prob_open * log_prob_open).sum(dim=1).mean()
+            # calculate open set loss
+            entropy_loss = self.opensetLoss.compute(Fo, dim=1)
+            # prob_open = F.softmax(Fo, dim=1)
+            # log_prob_open = F.log_softmax(Fo, dim=1)
+            # entropy_loss = -(prob_open * log_prob_open).sum(dim=1).mean()
 
             open_loss = -entropy_loss
             loss = loss + self.openset_loss_scale * open_loss
