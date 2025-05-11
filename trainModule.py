@@ -5,7 +5,7 @@ import torch
 from torch_geometric.data import Data, Batch
 from loadDataset import LoadDataset
 from dataset import FcgSampler, OpenSetFcgSampler
-from models import GraphSAGE, GCN, GraphSAGELayer
+from models import GraphSAGE, GCN, GIN, GraphSAGELayer, GCNLayer, GATLayer, GINLayer
 from torch_geometric.loader import DataLoader
 from torch.utils.data import ConcatDataset
 from loss import *
@@ -86,9 +86,25 @@ class TrainModule(Training):
                                        dim_out=info["output_size"], num_layers=info["num_layers"], 
                                        projection = info["projection"])
         elif info["model_name"] == "GCN":
-            self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], 
-                             dim_out=info["output_size"], num_layers=info["num_layers"], 
-                             projection = info["projection"])
+            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                self.model = GCNLayer(dim_in=info["input_size"], dim_h=info["hidden_size"], 
+                                      dim_o=info["output_size"], num_layers=info["num_layers"])
+            else:
+                self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], 
+                                dim_out=info["output_size"], num_layers=info["num_layers"], 
+                                projection = info["projection"])
+        elif info["model_name"] == "GAT":
+            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                self.model = GATLayer(dim_in=info["input_size"], dim_h=info["hidden_size"], 
+                                      dim_o=info["output_size"], num_layers=info["num_layers"])
+        elif info["model_name"] == "GIN":
+            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                self.model = GINLayer(dim_in=info["input_size"], dim_h=info["hidden_size"], 
+                                      dim_o=info["output_size"], num_layers=info["num_layers"])
+            else:
+                self.model = GIN(dim_in=info["input_size"], dim_h=info["hidden_size"], 
+                                dim_out=info["output_size"], num_layers=info["num_layers"], 
+                                projection = info["projection"])
         else:
             raise ValueError("Model not supported")
         
@@ -341,7 +357,20 @@ class TestModule(Testing):
                 self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
         elif info["model_name"] == "GCN":
             self.pretrainModel = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
-            self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                self.model = GCNLayer(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_o=info["output_size"], num_layers=info["num_layers"])
+            else:
+                self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+        elif info["model_name"] == "GAT":
+            ### pretrain_model
+            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                self.model = GATLayer(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_o=info["output_size"], num_layers=info["num_layers"])
+        elif info["model_name"] == "GIN":
+            self.pretrainModel = GIN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
+            if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                self.model = GINLayer(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_o=info["output_size"], num_layers=info["num_layers"])
+            else:
+                self.model = GIN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
         else:
             raise ValueError("Model not supported")
     

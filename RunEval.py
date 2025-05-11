@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     errorPath = os.path.dirname(configPath) + "/testError.txt"
     try:
-        test = TestModule(configPath, dataset, options)
+        test = TestModule(configPath, dataset)
         test.eval()
     except Exception as e:
         with open(errorPath, "w") as f:

@@ -758,8 +758,9 @@ class LabelPropagation(nn.Module, Loss):
         self.openset_m_samples = opt.get("settings", {}).get("openset", {}).get("test", {}).get("m_samples", 0)
         self.cls_training_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
         self.openset_loss_scale = opt.get("settings", {}).get("openset", {}).get("train", {}).get("loss_weight", 0.5)
+        self.relation_model = opt.get("settings", {}).get("few_shot", {}).get("parameters", {}).get("relation_model", "GraphSAGE")
         self.encoder = encoder
-        self.relation = GraphRelationNetwork(self.args["dim_in"], self.args["dim_hidden"], self.args["dim_out"], self.args["relation_layer"])
+        self.relation = GraphRelationNetwork(self.args["dim_in"], self.args["dim_hidden"], self.args["dim_out"], self.args["relation_layer"], self.relation_model)
 
         self.metric_name = opt["settings"]["train"]["distance"]
         self.distance_metric = DISTANCE_METRICS[self.metric_name]
@@ -903,20 +904,8 @@ class LabelPropagation(nn.Module, Loss):
         if self.enable_openset and num_open_samples > 0:
             # calculate open set loss
             entropy_loss = self.opensetLoss.compute(Fo, dim=1)
-            # prob_open = F.softmax(Fo, dim=1)
-            # log_prob_open = F.log_softmax(Fo, dim=1)
-            # entropy_loss = -(prob_open * log_prob_open).sum(dim=1).mean()
-
             open_loss = -entropy_loss
             loss = loss + self.openset_loss_scale * open_loss
-
-            # # claculate open set auroc
-            # temp_log = "./temp_log.txt"
-            # with open(temp_log, "a") as f:
-            #     f.write("Fq:\n")
-            #     f.write(f"{Fq}\n")
-            #     f.write("Fo:\n")
-            #     f.write(f"{Fo}\n")
 
             query_max_probs = F.softmax(Fq, dim=1).max(dim=1)[0]
             openset_max_probs = F.softmax(Fo, dim=1).max(dim=1)[0]
@@ -928,19 +917,9 @@ class LabelPropagation(nn.Module, Loss):
             ], dim=0)
 
             self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=False)
-            # with open(temp_log, "a") as f:
-            #     f.write("ROC Area:\n")
-            #     f.write(f"{self.openset_auroc}\n")
-            #     f.write("all_scores:\n")
-            #     all_scores = all_scores.cpu().numpy()
-            #     all_scores_str = "\n".join([str(x.item()) for x in all_scores])
-            #     f.write(all_scores_str)
-            #     f.write("labels:\n")
-            #     closed_labels = closed_labels.cpu().numpy()
-            #     closed_labels_str = "\n".join([str(x.item()) for x in closed_labels])
-            #     f.write(closed_labels_str)
-            #     f.write("\n")
-
+        
+        torch.cuda.empty_cache()
+        
         return loss, acc
     
     def get_encoded_data(self, data):

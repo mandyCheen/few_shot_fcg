@@ -9,9 +9,6 @@ from torch_geometric.utils.convert import from_networkx
 import sklearn.preprocessing as labelEncoder
 from datetime import datetime
 
-
-
-
 def load_GE_data(dataset: pd.DataFrame, embeddingFolder: str, embeddingSize: int, dataPath: str, openset: bool = False, opensetInfo: str = None):
     if not os.path.exists(dataPath):
         labels = []
@@ -231,7 +228,7 @@ class Training:
                 record_log(self.log_file, f"Epoch {epoch+1}/{self.epochs}: {content}\n")
                 if self.enable_openset:
                     record_log(self.log_file, 'Open-Set AUROC: {:.4f}\n'.format(avg_auc))
-
+                
             if self.valLoader is not None: 
                 self.model.eval()                
                 with tqdm(self.valLoader, desc=f"Epoch {epoch+1}/{self.epochs} (Validation)") as pbar:

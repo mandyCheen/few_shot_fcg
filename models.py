@@ -1,7 +1,8 @@
 import torch
 import torch.nn.functional as F
 import torch_geometric
-from torch_geometric.nn import SAGEConv, GCNConv, GINConv
+from torch_geometric.nn import SAGEConv, GCNConv, GINConv, GATConv
+from torch_geometric.nn import SparseGATConv
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout
 from torch_geometric.nn import global_mean_pool, global_add_pool
 import os
@@ -202,7 +203,7 @@ class GraphClassifier(torch.nn.Module):
         return h
     
 class GraphSAGELayer(nn.Module):
-    """使用PyTorch Geometric的GraphSAGE層"""
+    """使用PyTorch Geometric的GraphSAGE層 (without pooling)"""
     def __init__(self, dim_in: int, dim_h: int, dim_o:int, num_layers: int):
         super().__init__()
         self.num_layers = num_layers
@@ -236,12 +237,153 @@ class GraphSAGELayer(nn.Module):
             h = F.relu(h)
 
         return h
+    
+class GATLayer(nn.Module):
+    """使用PyTorch Geometric的GAT層 (without pooling)"""
+    def __init__(self, dim_in: int, dim_h: int, dim_o: int, num_layers: int, heads=4, dropout=0.1):
+        super().__init__()
+        self.num_layers = num_layers
+        
+        # GNN layers
+        self.gat_convs = torch.nn.ModuleList()
+        self.norms = torch.nn.ModuleList()
+        
+        # First layer (with multiple attention heads)
+        self.gat_convs.append(SparseGATConv(dim_in, dim_h // heads, heads=heads, dropout=dropout))
+        self.norms.append(BatchNorm1d(dim_h))
+        
+        # Additional layers
+        for _ in range(num_layers - 2):
+            self.gat_convs.append(GATConv(dim_h, dim_h // heads, heads=heads, dropout=dropout))
+            self.norms.append(BatchNorm1d(dim_h))
+        
+        if num_layers > 1:
+            # Final layer (typically with 1 head for output)
+            self.gat_convs.append(GATConv(dim_h, dim_o, heads=1, concat=False, dropout=dropout))
+            self.norms.append(BatchNorm1d(dim_o))
+
+    def forward(self, x, edge_index):
+        device = x.device
+        edge_index = edge_index.to(device)
+        
+        h = x
+        for i in range(self.num_layers):
+            h = self.gat_convs[i](h, edge_index)
+            h = self.norms[i](h)
+            h = F.elu(h)  # ELU activation commonly used with GAT
+
+        return h
+    
+class GINLayer(nn.Module):
+    """使用PyTorch Geometric的GIN層 (without pooling)"""
+    def __init__(self, dim_in: int, dim_h: int, dim_o: int, num_layers: int, eps=0.0, train_eps=True):
+        super().__init__()
+        self.num_layers = num_layers
+        
+        # GNN layers
+        self.gin_convs = torch.nn.ModuleList()
+        self.norms = torch.nn.ModuleList()
+        self.mlps = torch.nn.ModuleList()
+        
+        # First layer
+        # GIN requires an MLP for each layer
+        self.mlps.append(nn.Sequential(
+            nn.Linear(dim_in, dim_h),
+            nn.BatchNorm1d(dim_h),
+            nn.ReLU(),
+            nn.Linear(dim_h, dim_h)
+        ))
+        self.gin_convs.append(GINConv(self.mlps[0], eps=eps, train_eps=train_eps))
+        self.norms.append(BatchNorm1d(dim_h))
+        
+        # Additional layers
+        for i in range(num_layers - 2):
+            self.mlps.append(nn.Sequential(
+                nn.Linear(dim_h, dim_h),
+                nn.BatchNorm1d(dim_h),
+                nn.ReLU(),
+                nn.Linear(dim_h, dim_h)
+            ))
+            self.gin_convs.append(GINConv(self.mlps[i+1], eps=eps, train_eps=train_eps))
+            self.norms.append(BatchNorm1d(dim_h))
+        
+        if num_layers > 1:
+            # Final layer
+            self.mlps.append(nn.Sequential(
+                nn.Linear(dim_h, dim_h),
+                nn.BatchNorm1d(dim_h),
+                nn.ReLU(),
+                nn.Linear(dim_h, dim_o)
+            ))
+            self.gin_convs.append(GINConv(self.mlps[-1], eps=eps, train_eps=train_eps))
+            self.norms.append(BatchNorm1d(dim_o))
+
+    def forward(self, x, edge_index):
+        device = x.device
+        edge_index = edge_index.to(device)
+        
+        h = x
+        for i in range(self.num_layers):
+            h = self.gin_convs[i](h, edge_index)
+            h = self.norms[i](h)
+            h = F.relu(h)
+
+        return h
+    
+class GCNLayer(nn.Module):
+    """使用PyTorch Geometric的GCN層"""
+    def __init__(self, dim_in: int, dim_h: int, dim_o: int, num_layers: int, dropout=0.2):
+        super().__init__()
+        self.num_layers = num_layers
+        self.dropout = dropout
+        
+        # GNN layers
+        self.gcn_convs = torch.nn.ModuleList()
+        self.norms = torch.nn.ModuleList()
+        
+        # First layer
+        self.gcn_convs.append(GCNConv(dim_in, dim_h, improved=True))
+        self.norms.append(BatchNorm1d(dim_h))
+        
+        # Additional layers
+        for _ in range(num_layers - 2):
+            self.gcn_convs.append(GCNConv(dim_h, dim_h, improved=True))
+            self.norms.append(BatchNorm1d(dim_h))
+        
+        if num_layers > 1:
+            # Final layer
+            self.gcn_convs.append(GCNConv(dim_h, dim_o, improved=True))
+            self.norms.append(BatchNorm1d(dim_o))
+
+    def forward(self, x, edge_index):
+        device = x.device
+        edge_index = edge_index.to(device)
+        
+        h = x
+        for i in range(self.num_layers):
+            h = self.gcn_convs[i](h, edge_index)
+            h = self.norms[i](h)
+            h = F.relu(h)
+            h = F.dropout(h, p=self.dropout, training=self.training)
+
+        return h
+
 
 class GraphRelationNetwork(nn.Module):
     """基於GraphSAGE的關係網絡"""
-    def __init__(self, input_dim, hidden_dim, out_dim, layer_num):
+    def __init__(self, input_dim, hidden_dim, out_dim, layer_num, model_type='GraphSAGE'):
         super(GraphRelationNetwork, self).__init__()
-        self.sage = GraphSAGELayer(input_dim, hidden_dim, out_dim, num_layers=layer_num)
+        if model_type == 'GraphSAGE':
+            self.block = GraphSAGELayer(input_dim, hidden_dim, out_dim, num_layers=layer_num)
+        elif model_type == 'GCN':
+            self.block = GCNLayer(input_dim, hidden_dim, out_dim, num_layers=layer_num)
+        elif model_type == 'GIN':
+            self.block = GINLayer(input_dim, hidden_dim, out_dim, num_layers=layer_num)
+        elif model_type == 'GAT':
+            self.block = GATLayer(input_dim, hidden_dim, out_dim, num_layers=layer_num)
+        else:
+            raise ValueError(f"Unsupported model type: {model_type}")
+
         self.fc = nn.Sequential(
             nn.Linear(out_dim, out_dim // 2),
             nn.ReLU(),
@@ -249,6 +391,6 @@ class GraphRelationNetwork(nn.Module):
         )
 
     def forward(self, x, edge_index, batch):
-        h = self.sage(x, edge_index)
+        h = self.block(x, edge_index)
         h = global_add_pool(h, batch)
         return self.fc(h)
