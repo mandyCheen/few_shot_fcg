@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 import torch_geometric
 from torch_geometric.nn import SAGEConv, GCNConv, GINConv, GATConv
-from torch_geometric.nn import SparseGATConv
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout
 from torch_geometric.nn import global_mean_pool, global_add_pool
 import os
@@ -249,7 +248,7 @@ class GATLayer(nn.Module):
         self.norms = torch.nn.ModuleList()
         
         # First layer (with multiple attention heads)
-        self.gat_convs.append(SparseGATConv(dim_in, dim_h // heads, heads=heads, dropout=dropout))
+        self.gat_convs.append(GATConv(dim_in, dim_h // heads, heads=heads, dropout=dropout))
         self.norms.append(BatchNorm1d(dim_h))
         
         # Additional layers
