@@ -4,13 +4,14 @@ from loadDataset import LoadDataset
 from fcgVectorize import FCGVectorize
 from trainModule import TrainModule
 from trainModule import TestModule
+import datetime
 import os, torch
 
 warnings.filterwarnings("ignore")
 
 expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
 seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
-models = ["GCN", "GIN"]
+models = ["GCN", "GAT", "GIN"]
 # alphaList = [0.6, 0.7, 0.8, 0.9]
 ## always with pretrain
 # for alpha in alphaList:
@@ -22,11 +23,11 @@ models = ["GCN", "GIN"]
 
 for seed in seeds:
     print("seed: ", seed)
-
     for model in models:
-
         for exp in expList:
             if seed == 6 and model == "GCN":
+                continue
+            if seed == 6 and model == "GAT" and (exp == "5way_10shot" or exp == "5way_5shot"):
                 continue
             #     continue
             # options = load_config("./config/config_label_prop_pretrain.json")
@@ -60,6 +61,6 @@ for seed in seeds:
                 test = TestModule(os.path.join(trainModule.model_folder, "config.json"), dataset)
                 test.eval()
             except Exception as e:
-                open("./logs/Error_lp_models_exp_GCN_GIN.txt", "a").write(f"{exp} {model} {seed} {e}\n")
+                open("Error_lp_models_exp.txt", "a").write(f"{exp} {model} {seed} {e}\n")
 
             torch.cuda.empty_cache()
