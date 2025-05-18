@@ -9,9 +9,9 @@ import os, torch
 
 warnings.filterwarnings("ignore")
 
-expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
+expList = ["5way_1shot", "5way_2shot", "5way_3shot", "5way_4shot", "5way_6shot", "5way_7shot", "5way_8shot", "5way_9shot"]
 seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
-models = ["GCN", "GAT", "GIN"]
+models = ["GCN"]
 # alphaList = [0.6, 0.7, 0.8, 0.9]
 ## always with pretrain
 # for alpha in alphaList:
@@ -25,11 +25,6 @@ for seed in seeds:
     print("seed: ", seed)
     for model in models:
         for exp in expList:
-            if seed == 6 and model == "GCN":
-                continue
-            if seed == 6 and model == "GAT" and (exp == "5way_10shot" or exp == "5way_5shot"):
-                continue
-            #     continue
             # options = load_config("./config/config_label_prop_pretrain.json")
             options = load_config("./config/config_label_prop.json")
             print("exp: ", exp)
