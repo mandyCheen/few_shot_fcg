@@ -24,7 +24,7 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "10way_10shot_LabelPropagation_alpha0.7_k20",
+        "name": "10way_5shot_LabelPropagation_alpha0.7_k20_lambda0.1",
         "model": {
             "model_name": "GraphSAGE",
             "input_size": 128,
@@ -32,7 +32,7 @@
             "output_size": 128,
             "num_layers": 3,
             "projection": false,
-            "load_weights": "/home/mandy/Projects/few_shot_fcg/checkpoints/x86_64_withVal_withPretrain_ghidra_7_baseline/5way_5shot_LabelPropagation_alpha0.7_k20_20250315_175358/epoch_13_0.8993333566188813_best.pth",
+            "load_weights": "",
             "pretrained_model_folder": ""
         },
         "train": {
@@ -67,13 +67,13 @@
         "few_shot": {
             "method": "LabelPropagation",
             "train": {
-                "support_shots": 10,
-                "query_shots": 10,
+                "support_shots": 5,
+                "query_shots": 15,
                 "class_per_iter": 10
             },
             "test": {
-                "support_shots": 10,
-                "query_shots": 10,
+                "support_shots": 5,
+                "query_shots": 15,
                 "class_per_iter": 10
             },
             "parameters": {
@@ -95,14 +95,15 @@
             },
             "test": {
                 "m_samples": 20
-            }
+            },
+            "loss_weight": 0.1
         },
         "vectorize": {
             "node_embedding_method": "word2vec",
             "node_embedding_size": 128,
             "num_workers": 4
         },
-        "seed": 888
+        "seed": 6
     },
     "paths": {
         "data": {
