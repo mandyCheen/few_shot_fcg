@@ -239,7 +239,7 @@ class GraphSAGELayer(nn.Module):
     
 class GATLayer(nn.Module):
     """使用PyTorch Geometric的GAT層 (without pooling)"""
-    def __init__(self, dim_in: int, dim_h: int, dim_o: int, num_layers: int, heads=4, dropout=0.1):
+    def __init__(self, dim_in: int, dim_h: int, dim_o: int, num_layers: int, heads=8, dropout=0.1):
         super().__init__()
         self.num_layers = num_layers
         
@@ -299,7 +299,6 @@ class GINLayer(nn.Module):
         for i in range(num_layers - 2):
             self.mlps.append(nn.Sequential(
                 nn.Linear(dim_h, dim_h),
-                nn.BatchNorm1d(dim_h),
                 nn.ReLU(),
                 nn.Linear(dim_h, dim_h)
             ))
@@ -310,7 +309,6 @@ class GINLayer(nn.Module):
             # Final layer
             self.mlps.append(nn.Sequential(
                 nn.Linear(dim_h, dim_h),
-                nn.BatchNorm1d(dim_h),
                 nn.ReLU(),
                 nn.Linear(dim_h, dim_o)
             ))
