@@ -9,8 +9,8 @@ import torch
 
 warnings.filterwarnings("ignore")
 
-expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"] #, "5way_5shot", "5way_10shot"
-seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888] #
+expList = ["5way_5shot"] #, "5way_10shot", "10way_5shot", "10way_10shot"
+seeds = [7, 10, 666, 11, 19, 22, 31, 42, 888] # 6, 
 lambdaList = [0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1.0]
 
 for seed in seeds:
