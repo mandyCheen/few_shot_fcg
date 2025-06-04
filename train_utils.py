@@ -70,7 +70,7 @@ class Training:
         self.early_stopping = opt["settings"]["train"]["early_stopping"]["use"]
         self.early_stopping_patience = opt["settings"]["train"]["early_stopping"]["patience"]
 
-        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("use", False)
 
         self.model_folder = model_path     
         os.makedirs(self.model_folder, exist_ok=True)   
@@ -354,11 +354,12 @@ class Training:
         return True
 
 class Testing:
-    def __init__(self, device, loss_fn):
+    def __init__(self, device, loss_fn, openset=False):
         self.device = device
         self.loss_fn = loss_fn
+        self.openset = openset
     
-    def testing(self, testModel, testLoader, openset=False):
+    def testing(self, testModel, testLoader):
         avg_acc = list()
         avg_auc = list()
         for epoch in range(10):
@@ -369,19 +370,23 @@ class Testing:
                 data = data.to(self.device)
                 with torch.no_grad():
                     if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                        loss, acc = testModel(data, opensetTesting=openset)
-                        if openset:
+                        loss, acc = testModel(data, opensetTesting=self.openset)
+                        if self.openset:
                             avg_auc.append(testModel.openset_auroc)
                     else:
                         model_output = testModel(data)
-                        loss, acc = self.loss_fn(model_output, data.y, opensetTesting=openset)
-                        if openset:
+                        loss, acc = self.loss_fn(model_output, data.y, opensetTesting=self.openset)
+                        if self.openset:
                             avg_auc.append(self.loss_fn.openset_auroc)
                     avg_acc.append(acc.item())
+
+                print(f"Loss: {loss.item():.4f}, Accuracy: {acc.item():.4f}")
+                if self.openset:
+                    print(f"OpenSet AUROC: {testModel.openset_auroc:.4f}")
             torch.cuda.empty_cache()
                     
         avg_acc = np.mean(avg_acc)
-        if openset:
+        if self.openset:
             avg_auc = np.mean(avg_auc)
             print(f"Testing accuracy: {avg_acc:.4f}, OpenSet AUROC: {avg_auc:.4f}")
             return avg_acc, avg_auc

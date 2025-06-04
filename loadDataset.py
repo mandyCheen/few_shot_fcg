@@ -31,7 +31,7 @@ class LoadDataset:
             self.datasetName = f"{self.cpuArch}{splitByCpu}{val}{pretrain_}_{self.reverseTool}_{self.seed}"
             self.trainData, self.testData, self.valData = self.load_all_datasets()
             ## openset
-            self.enable_openset = opt.get("settings", {}).get("openset", {}).get("use", False)
+            self.enable_openset = opt.get("dataset", {}).get("openset", False)
             if self.enable_openset:
                 rawOSDatasetPath = os.path.join(opt["paths"]["data"]["csv_folder"], opt["dataset"]["openset_raw"])
                 rawOSDataset = pd.read_csv(rawOSDatasetPath)
