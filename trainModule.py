@@ -42,7 +42,7 @@ class TrainModule(Training):
         self.query_shots_test = opt["settings"]["few_shot"]["test"]["query_shots"]
         self.class_per_iter_test = opt["settings"]["few_shot"]["test"]["class_per_iter"]
         
-        self.enable_openset = dataset.enable_openset
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("use", False)
         if self.enable_openset:
             self.openset_m_samples = opt["settings"]["openset"]["train"]["m_samples"]
             self.openset_class_per_iter = opt["settings"]["openset"]["train"]["class_per_iter"]
@@ -180,6 +180,8 @@ class TrainModule(Training):
             loss_fn = SoftNnLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
             loss_fn = LabelPropagation(self.opt, self.model)
+        elif self.opt["settings"]["few_shot"]["method"] == "MatchNet":
+            loss_fn = MatchLoss(self.opt)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -321,7 +323,8 @@ class TestModule(Testing):
 
         self.support_shots_test = opt["settings"]["few_shot"]["test"]["support_shots"]
         self.query_shots_test = opt["settings"]["few_shot"]["test"]["query_shots"]
-        self.openset_m_samples = opt["settings"]["openset"]["test"]["m_samples"] if dataset.enable_openset else 0
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("test", {}).get("use", False)
+        self.openset_m_samples = opt["settings"]["openset"]["test"]["m_samples"] if self.enable_openset else 0
         self.class_per_iter_test = opt["settings"]["few_shot"]["test"]["class_per_iter"]
 
         self.iterations = opt["settings"]["train"]["iterations"]
@@ -334,6 +337,7 @@ class TestModule(Testing):
         super().__init__(
             device=self.device,
             loss_fn=self.loss_fn,
+            openset=self.enable_openset,
         )
         
     def get_loss_fn(self):
@@ -345,6 +349,8 @@ class TestModule(Testing):
             loss_fn = SoftNnLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
             loss_fn = LabelPropagation(self.opt, self.model)
+        elif self.opt["settings"]["few_shot"]["method"] == "MatchNet":
+            loss_fn = MatchLoss(self.opt)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -379,7 +385,7 @@ class TestModule(Testing):
         print("Setting up the testing module...")
         testGraph, label = load_GE_data(self.testDataset, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, "testData.pkl"))
         print(f"Loading data from {self.embeddingFolder}...")
-        if self.opensetData is not None:
+        if self.opensetData is not None and self.enable_openset:
             print("Generating open set testing data...")
             print("Loading openset data...")
             if self.opt["dataset"]["openset_data_mode"] == "random":
@@ -395,7 +401,6 @@ class TestModule(Testing):
             opensetSampler = OpenSetFcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations, opensetGraph, self.openset_m_samples)
             self.opensetTestLoader = DataLoader(ConcatDataset([testGraph, opensetGraph]), batch_sampler=opensetSampler, num_workers=4, collate_fn=collate_graphs)    
         else:
-
             print("Generating closed set testing data...")
             print("Loading testing data...")
             sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)
@@ -415,7 +420,7 @@ class TestModule(Testing):
         print(f"Model loaded from {model_path}")
         self.model = self.model.to(self.device)
     
-    def eval(self, model_path: str = None, mode: str = "closedset"):
+    def eval(self, model_path: str = None):
 
         """
         Evaluate the model on the test dataset.
@@ -423,9 +428,7 @@ class TestModule(Testing):
             model_path (str): Path to the model file. If None, the best model will be used.
             mode (str): Evaluation mode, either "closedset" or "openset".
         """
-
-        assert(mode == "closedset" or mode == "openset", "Mode not supported")
-        
+    
         if model_path is None:
             print("Model path is not provided. Using the best model...")
             model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
@@ -433,7 +436,7 @@ class TestModule(Testing):
         evalFolder = os.path.dirname(model_path)
         logFolder = os.path.dirname(self.model_folder)
         
-        if mode == "closedset":
+        if self.enable_openset == False:
             assert(self.loss_fn.enable_openset == False, "Open set evaluation is not supported in this mode")
 
             print("Record evaluation log...")
@@ -456,16 +459,18 @@ class TestModule(Testing):
         self.model = self.model.to(self.device)
         
         print(f"Model: {self.model}")
-        print(f"Start evaluation... (testing dataset / {mode} dataset)")
-        if mode == "closedset": 
+        print(f"Start evaluation... (testing dataset)")
+        if self.enable_openset == False: 
             testAcc = self.testing(self.model, self.testLoader)
         else:
-            testAcc, testAuc = self.testing(self.model, self.opensetTestLoader, True)
+            print("Open set evaluation enabled")
+            print(f"Open set m_samples: {self.openset_m_samples}")
+            testAcc, testAuc = self.testing(self.model, self.opensetTestLoader)
         if os.path.basename(evalFolder).split("_")[0] == "10way" and self.opt["settings"]["few_shot"]["test"]["class_per_iter"] == 5:
             folder_name = os.path.basename(evalFolder) + "_test_in_5way"
         else:
             folder_name = os.path.basename(evalFolder)
-        if mode == "closedset":
+        if self.enable_openset == False:
             print(f"Closed set test accuracy: {testAcc}")
             with open(evalLogPath, "a") as f:
                 f.write(f"{datetime.now()}, {folder_name}, {os.path.basename(model_path)}, {testAcc}\n")

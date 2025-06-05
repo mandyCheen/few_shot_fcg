@@ -37,10 +37,10 @@ for seed in seeds:
             # base_path = f"/home/mandy/Projects/few_shot_fcg/checkpoints/x86_64_withVal_withPretrain_ghidra_{seed}_baseline"
             # dir_pattern = f"{exp}_LabelPropagation_alpha{alpha}_k20_2"
 
-            # matching_dirs = os.path.join(base_path, [d for d in os.listdir(base_path) if dir_pattern in d][0])
-            # print("matching_dirs: ", matching_dirs)
-            # model_path = os.path.join(matching_dirs, [f for f in os.listdir(matching_dirs) if "best" in f][0])
-            # print("model_path: ", model_path)
+        # matching_dirs = os.path.join(base_path, [d for d in os.listdir(base_path) if dir_pattern in d][0])
+        # print("matching_dirs: ", matching_dirs)
+        # model_path = os.path.join(matching_dirs, [f for f in os.listdir(matching_dirs) if "best" in f][0])
+        # print("model_path: ", model_path)
 
             # options["settings"]["model"]["load_weights"] = model_path
             save_config(options, "../config/config_label_prop_openset_meta_nict.json")
@@ -51,7 +51,7 @@ for seed in seeds:
             trainModule = TrainModule(options, dataset)
             trainModule.train()
 
-            test = TestModule(os.path.join(trainModule.model_folder, "config.json"), dataset)
-            test.eval(mode="openset")
+        test = TestModule(os.path.join(trainModule.model_folder, "config.json"), dataset)
+        test.eval(mode="openset")
 
-            torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
