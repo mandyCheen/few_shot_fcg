@@ -364,25 +364,30 @@ class Testing:
         avg_auc = list()
         for epoch in range(10):
             print(f"Epoch {epoch+1}")
-            for data in tqdm(testLoader, desc="Testing"):
-                testModel.eval()
-                # print(np.unique(data.y))
-                data = data.to(self.device)
-                with torch.no_grad():
-                    if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
-                        loss, acc = testModel(data, opensetTesting=self.openset)
-                        if self.openset:
-                            avg_auc.append(testModel.openset_auroc)
-                    else:
-                        model_output = testModel(data)
-                        loss, acc = self.loss_fn(model_output, data.y, opensetTesting=self.openset)
-                        if self.openset:
-                            avg_auc.append(self.loss_fn.openset_auroc)
-                    avg_acc.append(acc.item())
-
-                print(f"Loss: {loss.item():.4f}, Accuracy: {acc.item():.4f}")
-                if self.openset:
-                    print(f"OpenSet AUROC: {testModel.openset_auroc:.4f}")
+            with tqdm(testLoader, desc=f"Epoch {epoch+1}/{10} (Testing)") as pbar:
+                for data in pbar:
+                    testModel.eval()
+                    # print(np.unique(data.y))
+                    data = data.to(self.device)
+                    with torch.no_grad():
+                        if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+                            loss, acc = testModel(data, opensetTesting=self.openset)
+                            if self.openset:
+                                avg_auc.append(testModel.openset_auroc)
+                                opauroc = testModel.openset_auroc
+                        else:
+                            model_output = testModel(data)
+                            loss, acc = self.loss_fn(model_output, data.y, opensetTesting=self.openset)
+                            if self.openset:
+                                avg_auc.append(self.loss_fn.openset_auroc)
+                                opauroc = self.loss_fn.openset_auroc
+                        avg_acc.append(acc.item())
+                    # Update progress bar with current batch metrics
+                    pbar.set_postfix({
+                        'loss': f'{loss.item():.4f}',
+                        'acc': f'{acc.item():.4f}',
+                        'openset_auc': f'{opauroc:.4f}' if self.openset else 'N/A'
+                    })
             torch.cuda.empty_cache()
                     
         avg_acc = np.mean(avg_acc)

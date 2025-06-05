@@ -9,8 +9,8 @@ import os, torch
 
 warnings.filterwarnings("ignore")
 
-expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot",]
-seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
+expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
+seeds = [7, 10, 666, 11, 19, 22, 31, 42, 888] #6, 
 # models = ["GCN"]
 date = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 # # alphaList = [0.6, 0.7, 0.8, 0.9]
@@ -31,6 +31,8 @@ date = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 for seed in seeds:
     print("seed: ", seed)
     for exp in expList:
+        if seed == 7 and (exp == "5way_5shot" or exp == "10way_5shot" or exp == "5way_10shot"):
+            continue
         # options = load_config("./config/config_label_prop_pretrain.json")
         options = load_config("./config/config_match_gcn.json")
         print("exp: ", exp)
@@ -58,7 +60,7 @@ for seed in seeds:
         # # options["settings"]["few_shot"]["parameters"]["alpha"] = alpha
         # options["settings"]["few_shot"]["parameters"]["k"] = 20
         options["settings"]["seed"] = seed
-        save_config(options, "./config/config_label_prop.json")
+        save_config(options, "./config/config_match_gcn.json")
 
         dataset = LoadDataset(options)
         # vectorizer = FCGVectorize(options, dataset)
@@ -71,6 +73,6 @@ for seed in seeds:
             test.eval()
         except Exception as e:
             now = datetime.datetime.now()
-            open(f"./logs/Error_lp_models_exp_{date}.txt", "a").write(f"{now}: {exp} seed:{seed} {e}\n")
+            open(f"./logs/Error_log_{date}.txt", "a").write(f"{now}: {exp} seed:{seed} {e}\n")
 
         torch.cuda.empty_cache()
