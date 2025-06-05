@@ -4,6 +4,7 @@ from loadDataset import LoadDataset
 from trainModule import TrainModule, TestModule
 from fcgVectorize import FCGVectorize
 import warnings
+import os
 warnings.filterwarnings("ignore")
 
 def parse_args():
@@ -18,15 +19,20 @@ if __name__ == '__main__':
     
     dataset = LoadDataset(options)
     
-    vectorize = FCGVectorize(options, dataset)
-    vectorize.node_embedding(dataset.rawDataset)
+    # vectorize = FCGVectorize(options, dataset)
+    # vectorize.node_embedding(dataset.rawDataset)
     
     train = TrainModule(options, dataset)
     errorPath = train.model_folder + "/error.txt"
     try:
         train.train()
+
+        test = TestModule(os.path.join(train.model_folder, "config.json"), dataset)
+        test.eval()
     except Exception as e:
         with open(errorPath, "w") as f:
             f.write(str(e))
         raise
+
+
           
