@@ -47,4 +47,4 @@ for seed in seeds:
 
             dataset = LoadDataset(opt)
             test = TestModule(configPath=new_configPath, dataset = dataset)
-            test.eval(mode="openset")
+            test.eval()
