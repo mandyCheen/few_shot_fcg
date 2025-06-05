@@ -46,6 +46,7 @@ class TrainModule(Training):
         if self.enable_openset:
             self.openset_m_samples = opt["settings"]["openset"]["train"]["m_samples"]
             self.openset_class_per_iter = opt["settings"]["openset"]["train"]["class_per_iter"]
+            self.openset_m_samples_test = opt["settings"]["openset"]["test"]["m_samples"]
 
         self.iterations = opt["settings"]["train"]["iterations"]
         self.device = opt["settings"]["train"]["device"]
@@ -235,7 +236,7 @@ class TrainModule(Training):
                 opensetGraph, _ = load_GE_data(self.opensetData, self.embeddingFolder, self.embeddingSize, os.path.join(self.embeddingFolder, opensetPklName), openset=True, opensetInfo=info)
                 # self.opensetLoader = DataLoader(opensetGraph, batch_size=20, shuffle=True, num_workers=4, collate_fn=collate_graphs)
                 
-                opensetSampler = OpenSetFcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations, opensetGraph, self.openset_m_samples)
+                opensetSampler = OpenSetFcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations, opensetGraph, self.openset_m_samples_test)
                 self.valLoader = DataLoader(ConcatDataset([self.valGraph, opensetGraph]), batch_sampler=opensetSampler, num_workers=4, collate_fn=collate_graphs)    
             else:
                 val_sampler = FcgSampler(label, self.support_shots_test + self.query_shots_test, self.class_per_iter_test, self.iterations)

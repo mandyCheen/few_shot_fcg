@@ -10,14 +10,14 @@ import torch
 warnings.filterwarnings("ignore")
 
 expList = ["5way_5shot"] #, "5way_10shot", "10way_5shot", "10way_10shot"
-seeds = [7, 10, 666, 11, 19, 22, 31, 42, 888] # 6, 
+seeds = [7, 10, 666, 11, 19] # 6, 22, 31, 42, 888
 lambdaList = [0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1.0]
 
 for seed in seeds:
     print("seed: ", seed)
     for exp in expList:
         for lambda_ in lambdaList:
-            options = load_config("../config/config_label_prop_openset_meta.json")
+            options = load_config("../config/config_label_prop_openset_meta_nict.json")
             print("exp: ", exp)
             print("lambda: ", lambda_)
             options["settings"]["name"] = exp+f"_LabelPropagation_alpha0.7_k20_lambda{lambda_}"
@@ -43,11 +43,11 @@ for seed in seeds:
             # print("model_path: ", model_path)
 
             # options["settings"]["model"]["load_weights"] = model_path
-            save_config(options, "../config/config_label_prop_openset_meta.json")
+            save_config(options, "../config/config_label_prop_openset_meta_nict.json")
 
             dataset = LoadDataset(options)
-            vectorizer = FCGVectorize(options, dataset)
-            vectorizer.node_embedding(dataset.opensetData, openset=True)
+            # vectorizer = FCGVectorize(options, dataset)
+            # vectorizer.node_embedding(dataset.opensetData, openset=True)
             trainModule = TrainModule(options, dataset)
             trainModule.train()
 
