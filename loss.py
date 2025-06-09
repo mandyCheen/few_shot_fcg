@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout
-from models import GraphRelationNetwork
+from models import GraphRelationNetwork, MLPRelationModule
 from torch_geometric.nn import global_add_pool
 
 class DistanceMetric:
@@ -957,6 +957,111 @@ class MatchLoss(Loss):
             "fce": self.fce,
             "attention_layers": self.attention_layers
         }
+
+class RelationNetwork(nn.Module, Loss):
+    """
+    Few-shot Relation Network，採 GCN 做 relation learning。
+    需傳入外部 encoder（CNN / Transformer / …），
+    encoder 產生節點特徵後交由 GCN 傳遞。
+    """
+    def __init__(self, opt: dict, encoder: nn.Module):
+        super(RelationNetwork, self).__init__()
+        self.opt = opt
+        self.device = opt["settings"]["train"]["device"]
+        self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("use", False)
+        self.openset_m_samples = opt.get("settings", {}).get("openset", {}).get("test", {}).get("m_samples", 0)
+        self.cls_training_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
+        self.openset_loss_scale = opt.get("settings", {}).get("openset", {}).get("train", {}).get("loss_weight", 0.5)
+
+        self.encoder = encoder
+        self.relation = MLPRelationModule(2 * self.opt["settings"]["model"]["output_size"])
+
+        self.ce = nn.CrossEntropyLoss()
+        self.opensetLoss = EntropyLoss()
+
+    def forward(self, data, opensetTesting: bool = False):
+
+        input = self.encoder(data)
+        target = data.y
+
+        if opensetTesting: # openset testing
+            num = len(target) - self.openset_m_samples
+            closed_target = target[:num]
+            _, support_idxs, query_idxs = self.get_support_query_idxs(closed_target)
+            num_support_classes = len(torch.unique(closed_target))
+            num_open_samples = self.openset_m_samples
+            openset_idxs = torch.arange(len(target))[num:]
+        elif self.enable_openset: # openset training
+            # get support and query indices
+            _, support_idxs, query_idxs, openset_idxs = self.get_support_query_idxs(target, openset=True, cls_openset=self.cls_training_openset)
+            num_support_classes = len(torch.unique(target)) - self.cls_training_openset
+            num_open_samples = len(openset_idxs)
+        else: # closed set training & testing
+            _, support_idxs, query_idxs = self.get_support_query_idxs(target)
+            num_support_classes = len(torch.unique(target))
+            num_open_samples = 0
+
+        num_queries = (20 - self.n_support) * num_support_classes  # 每個類別20個query樣本
+
+        s_labels_ori = torch.cat([target[idx_list] for idx_list in support_idxs])
+        q_labels_ori = target[query_idxs]
+        unique_labels = torch.unique(torch.cat([s_labels_ori, q_labels_ori]))
+        label_map = {label.item(): idx for idx, label in enumerate(unique_labels)}
+        s_labels_mapped = torch.tensor([label_map[label.item()] for label in s_labels_ori]).to(self.device)
+        q_labels_mapped = torch.tensor([label_map[label.item()] for label in q_labels_ori]).to(self.device)
+        # generate one-hot labels
+        s_labels = F.one_hot(s_labels_mapped, num_support_classes)
+        q_labels = F.one_hot(q_labels_mapped, num_support_classes)
+
+        prototypes = self.compute_prototypes(input, support_idxs)
+        query_samples = input[query_idxs]
+
+        # 為了處理 openset 情況，如果有 openset samples，也將它們加入 query
+        if self.enable_openset or opensetTesting:
+            if num_open_samples > 0:
+                openset_samples = input[openset_idxs]  # shape: [num_open_samples, 128]
+                query_samples = torch.cat([query_samples, openset_samples], dim=0)
+
+        prototypes_ext = prototypes.unsqueeze(0).repeat(num_queries + num_open_samples, 1, 1) # [num_queries, num_support_classes, 128]
+        query_samples_ext = query_samples.unsqueeze(1).repeat(1, num_support_classes, 1)  # [num_queries, num_support_classes, 128]
+
+        relation_pairs = torch.cat([prototypes_ext, query_samples_ext], dim=2)  # [num_queries, num_support_classes, 256]
+        relation_pairs = relation_pairs.view(-1, 256)
+        # 通過 relation network 計算 relation scores
+        self.relation.to(self.device)
+        relations = self.relation(relation_pairs)  # [num_queries, 1]
+        relationscore = relations.view(num_queries + num_open_samples, num_support_classes)
+        # 計算損失和準確率
+        query_relationscore = relationscore[:num_queries, :]  # [num_queries , num_support_classes]
+        gtq = torch.argmax(q_labels, 1)
+        loss = self.ce(query_relationscore, gtq)
+        # 計算準確率
+        predq = torch.argmax(query_relationscore, 1)
+        correct = (predq == gtq).sum()
+
+        total = num_queries
+        acc = 1.0 * correct.float() / float(total)
+
+        if (self.enable_openset or opensetTesting) and num_open_samples > 0:
+            if self.enable_openset:
+                entropy_loss = self.opensetLoss.compute(relationscore[num_queries:], dim=1)
+                open_loss = -entropy_loss 
+                loss = loss + self.openset_loss_scale * open_loss
+
+            query_max_probs = F.softmax(query_relationscore, dim=1).max(dim=1)[0]
+            openset_max_probs = F.softmax(relationscore[num_queries:], dim=1).max(dim=1)[0]
+
+            all_scores = torch.cat([query_max_probs, openset_max_probs], dim=0)
+            closed_labels = torch.cat([
+                torch.ones(query_max_probs.size(0), device=self.device),
+                -torch.ones(openset_max_probs.size(0), device=self.device)
+            ], dim=0)
+
+            self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=False)
+
+        torch.cuda.empty_cache()
+        return loss, acc
 
 class ClassifierLoss(Loss):
     def __init__(self, opt: dict):

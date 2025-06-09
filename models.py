@@ -364,7 +364,45 @@ class GCNLayer(nn.Module):
             h = F.dropout(h, p=self.dropout, training=self.training)
 
         return h
+    
+class CNNLayer(nn.Module):
+    """使用PyTorch的CNN層"""
+    def __init__(self, dim_in: int, dim_h: int, dim_o: int, num_layers: int, 
+                 kernel_size=3, padding=1, dropout=0.2):
+        super().__init__()
+        self.num_layers = num_layers
+        self.dropout = dropout
+        
+        # CNN layers
+        self.conv_layers = torch.nn.ModuleList()
+        self.norms = torch.nn.ModuleList()
+        
+        # First layer
+        self.conv_layers.append(nn.Conv2d(dim_in, dim_h, kernel_size=kernel_size, 
+                                         padding=padding))
+        self.norms.append(nn.BatchNorm2d(dim_h))
+        
+        # Additional layers
+        for _ in range(num_layers - 2):
+            self.conv_layers.append(nn.Conv2d(dim_h, dim_h, kernel_size=kernel_size, 
+                                             padding=padding))
+            self.norms.append(nn.BatchNorm2d(dim_h))
+        
+        if num_layers > 1:
+            # Final layer
+            self.conv_layers.append(nn.Conv2d(dim_h, dim_o, kernel_size=kernel_size, 
+                                             padding=padding))
+            self.norms.append(nn.BatchNorm2d(dim_o))
 
+    def forward(self, x):
+        h = x
+        for i in range(self.num_layers):
+            h = self.conv_layers[i](h)
+            h = self.norms[i](h)
+            h = F.relu(h)
+            h = F.dropout(h, p=self.dropout, training=self.training)
+
+        return h
 
 class GraphRelationNetwork(nn.Module):
     """基於GraphSAGE的關係網絡"""
@@ -391,3 +429,21 @@ class GraphRelationNetwork(nn.Module):
         h = self.block(x, edge_index)
         h = global_add_pool(h, batch)
         return self.fc(h)
+    
+class MLPRelationModule(nn.Module):
+    """MLP-based Relation Module for Relation Network"""
+    def __init__(self, dim_in: int, dropout: float = 0.2):
+        super().__init__()
+        
+        self.fc = nn.Sequential(
+            nn.Linear(dim_in, dim_in // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_in // 2, dim_in // 4),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_in // 4, 1)
+        )
+    
+    def forward(self, x):
+        return self.fc(x)

@@ -182,6 +182,8 @@ class TrainModule(Training):
             loss_fn = LabelPropagation(self.opt, self.model)
         elif self.opt["settings"]["few_shot"]["method"] == "MatchNet":
             loss_fn = MatchLoss(self.opt)
+        elif self.opt["settings"]["few_shot"]["method"] == "RelationNetwork":
+            loss_fn = RelationNetwork(self.opt, self.model)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -248,7 +250,7 @@ class TrainModule(Training):
 
         self.get_backbone()
         self.get_loss_fn()
-        if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+        if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork"):
             self.model = self.loss_fn
         self.get_optimizer()
         if self.lr_scheduler:
@@ -351,6 +353,8 @@ class TestModule(Testing):
             loss_fn = LabelPropagation(self.opt, self.model)
         elif self.opt["settings"]["few_shot"]["method"] == "MatchNet":
             loss_fn = MatchLoss(self.opt)
+        elif self.opt["settings"]["few_shot"]["method"] == "RelationNetwork":
+            loss_fn = RelationNetwork(self.opt, self.model)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -409,7 +413,7 @@ class TestModule(Testing):
         self.generate_model()
         self.get_loss_fn()
         
-        if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
+        if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork"):
             self.model = self.loss_fn
 
         print("Finish setting up the testing module")
