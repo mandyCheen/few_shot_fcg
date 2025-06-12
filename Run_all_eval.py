@@ -8,11 +8,14 @@ from trainModule import TestModule
 warnings.filterwarnings("ignore")
 
 expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
-seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
+seeds = [10] #6, 7, 10, 666, 11, 19, 22, 31, 42, 888
 
 for seed in seeds:
     rootFolder = f"/home/mandy/Projects/few_shot_fcg/checkpoints/x86_64_withVal_withPretrain_ghidra_{seed}_modelExp"
     for exp in expList:
+        if seed == 19:
+            if exp == "5way_5shot" or exp == "5way_10shot":
+                continue
         print("seed: ", seed)
         print("exp: ", exp)
         for folder in os.listdir(rootFolder):
@@ -38,7 +41,10 @@ for seed in seeds:
                                 }
                             }
                 options["settings"]["openset"] = opensetSettings
-                save_config(configPath, options)
+                options["settings"]["train"]["device"] = "cuda:0"
+                options["paths"]["data"]["embedding_folder"] = "/mnt/ssd2t/mandy/Projects/few_shot_fcg/embeddings"
+            
+                save_config(options, configPath)
                 dataset = LoadDataset(options)
                 test = TestModule(configPath=configPath, dataset=dataset)
                 test.eval()

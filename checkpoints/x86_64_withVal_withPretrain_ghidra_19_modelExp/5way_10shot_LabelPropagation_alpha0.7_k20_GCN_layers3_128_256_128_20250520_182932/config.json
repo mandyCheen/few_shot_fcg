@@ -11,7 +11,11 @@
             "ngioweb",
             "mirai",
             "tsunami"
-        ]
+        ],
+        "openset": true,
+        "openset_raw": "malware_diec_ghidra_x86_64_fcg_openset_dataset_rm0node.csv",
+        "openset_data_mode": "random",
+        "openset_data_ratio": 0.2
     },
     "pretrain": {
         "name": "x86_pretrained",
@@ -88,7 +92,17 @@
             "node_embedding_size": 128,
             "num_workers": 4
         },
-        "seed": 19
+        "seed": 19,
+        "openset": {
+            "train": {
+                "use": false
+            },
+            "test": {
+                "use": true,
+                "m_samples": 50,
+                "class_per_iter": 5
+            }
+        }
     },
     "paths": {
         "data": {
