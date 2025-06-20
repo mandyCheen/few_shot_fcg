@@ -9,18 +9,18 @@ import torch
 
 warnings.filterwarnings("ignore")
 
-expList = ["5way_10shot", "10way_5shot", "10way_10shot"]
+expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
 seeds = [6, 22, 31, 42, 888, 7, 10, 666, 11, 19]
-lambdaList = [0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1.0]
+lambdaList = [1.0, 1.5, 2.0]
 
 for seed in seeds:
     print("seed: ", seed)
     for exp in expList:
         for lambda_ in lambdaList:
-            options = load_config("../config/config_label_prop_openset_meta_nict.json")
+            options = load_config("../config/config_label_prop_openset_meta_14.json")
             print("exp: ", exp)
             print("lambda: ", lambda_)
-            options["settings"]["name"] = exp+f"_LabelPropagation_alpha0.7_k20_lambda{lambda_}"
+            options["settings"]["name"] = exp+f"_lambda{lambda_}"
             shots = int(exp.split("_")[1].split("shot")[0])
             way = int(exp.split("_")[0].split("way")[0])
             options["settings"]["few_shot"]["train"]["support_shots"] = shots
@@ -29,10 +29,9 @@ for seed in seeds:
             options["settings"]["few_shot"]["test"]["query_shots"] = 20 - shots
             options["settings"]["few_shot"]["train"]["class_per_iter"] = way
             options["settings"]["few_shot"]["test"]["class_per_iter"] = way
-            options["settings"]["train"]["device"] = "cuda:0"
             options["settings"]["openset"]["train"]["loss_weight"] = lambda_
             options["settings"]["seed"] = seed
-            save_config(options, "../config/config_label_prop_openset_meta_nict.json")
+            save_config(options, "../config/config_label_prop_openset_meta_14.json")
 
             dataset = LoadDataset(options)
 
