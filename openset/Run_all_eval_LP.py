@@ -9,42 +9,32 @@ from trainModule import TestModule
 warnings.filterwarnings("ignore")
 
 expList = ["5way_5shot", "5way_10shot", "10way_5shot", "10way_10shot"]
-seeds = [6, 7, 10, 666, 11, 19, 22, 31, 42, 888]
+seeds = [6, 22, 31, 42, 888, 7, 10, 666, 11, 19]
+lambdaList = [1.0, 1.5, 2.0]
 
 for seed in seeds:
+    rootFolder = f"/home/manying/Projects/fcgFewShot/checkpoints/x86_64_withVal_withPretrain_ghidra_{seed}_openset"
     
-    rootFolder = f"/home/mandy/Projects/few_shot_fcg/checkpoints/x86_64_withVal_withPretrain_ghidra_{seed}_openset"
-
     for exp in expList:
-        print("seed: ", seed)
         print("exp: ", exp)
-        modelFolder = [d for d in os.listdir(rootFolder) if exp in d]
+        for folder in os.listdir(rootFolder):
+            if os.path.isdir(os.path.join(rootFolder, folder)):
+                if "lambda" not in folder:
+                    continue
+                if exp not in folder:
+                    continue
+                lambda_value = float((folder.split("_")[6]).split("lambda")[1])
+                if lambda_value not in lambdaList:
+                    continue
+                
+                print("modelFolder: ", folder)
+                modelFolder = folder
+                modelPath = os.path.join(rootFolder, modelFolder)
 
-        # for method in methodList:
-        for modelFolder_ in modelFolder:
-        #         if method in modelFolder_:
-            print("modelFolder: ", modelFolder_)
-            modelPath = os.path.join(rootFolder, modelFolder_)
+                configPath = os.path.join(modelPath, "config.json")
+                options = load_config(configPath)
 
-            configPath = os.path.join(modelPath, "config.json")
-            new_configPath = os.path.join(modelPath, "config_openset.json")
-            opt = load_config(configPath)
-            # opt["dataset"]["openset"] = True
-            # opt["dataset"]["openset_raw"] = "malware_diec_ghidra_x86_64_fcg_openset_dataset_rm0node.csv"
-            # opt["dataset"]["openset_data_ratio"] = 0.2
-            # opt["dataset"]["openset_data_mode"] = "random"
-            # opt["settings"]["openset"] = {}
-            # opt["settings"]["openset"]["test"] = {}
-            # opt["settings"]["openset"]["use"] = True
-            opt["settings"]["openset"]["test"]["m_samples"] = 50
-            # opt["settings"]["train"]["distance"] = "euclidean"
-
-            # opt["paths"]["data"]["csv_folder"] = "../dataset/raw_csv"
-            # opt["paths"]["data"]["split_folder"] = "../dataset/split"
-            # opt["paths"]["data"]["openset_dataset"] = "/mnt/ssd2t/mandy/Projects/few_shot_fcg/dataset/data_ghidra_fcg_openset"
-            # opt["paths"]["model"]["model_folder"] = "../checkpoints"
-            save_config(opt, new_configPath)
-
-            dataset = LoadDataset(opt)
-            test = TestModule(configPath=new_configPath, dataset = dataset)
-            test.eval()
+                # save_config(options, configPath)
+                dataset = LoadDataset(options)
+                test = TestModule(configPath=configPath, dataset=dataset)
+                test.eval()

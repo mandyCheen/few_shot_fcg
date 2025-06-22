@@ -40,11 +40,15 @@ class FCGVectorize():
             fileName = row["file_name"]
             filePath = f"{self.data_root}/{cpu}/{family}/{fileName}.gpickle"
             outputPath = f"{self.embeddingFolder}/{cpu}/{family}/{fileName}.gpickle"
+            nodes_to_remove = []
             if not os.path.exists(outputPath):
                 with open(filePath, "rb") as f:
                     fcg = pickle.load(f)
                     for node in fcg.nodes():
                         avgOpcodeEmbedding = []
+                        if "x" not in fcg.nodes[node]:
+                            nodes_to_remove += [node]
+                            continue
                         opcode = fcg.nodes[node]["x"]
                         opcode = [op for op in opcode if op in model.wv]
                         if opcode == []:
@@ -55,6 +59,7 @@ class FCGVectorize():
                         opcodeEmbedding = torch.tensor(opcodeEmbedding)
                         avgOpcodeEmbedding = torch.mean(opcodeEmbedding, dim=0)
                         fcg.nodes[node]["x"] = avgOpcodeEmbedding
+                    fcg.remove_nodes_from(nodes_to_remove)
                 if not os.path.exists(f"{self.embeddingFolder}/{cpu}/{family}"):
                     os.makedirs(f"{self.embeddingFolder}/{cpu}/{family}")
                 with open(outputPath, "wb") as f:
@@ -71,6 +76,8 @@ class FCGVectorize():
             with open(filePath, "rb") as f:
                 fcg = pickle.load(f)
                 for node in fcg.nodes():
+                    if "x" not in fcg.nodes[node]:
+                        continue
                     opcode = fcg.nodes[node]["x"]
                     opcodeSet.update(opcode)
                     sentences.append(opcode)

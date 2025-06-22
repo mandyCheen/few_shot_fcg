@@ -436,7 +436,9 @@ class TestModule(Testing):
         if model_path is None:
             print("Model path is not provided. Using the best model...")
             model_path = os.path.join(self.model_folder, [f for f in os.listdir(self.model_folder) if "best" in f][0])
-            
+            model_name = os.path.basename(model_path)
+        else:
+            model_name = os.path.dirname(model_path).split("/")[-1] + "_" + os.path.basename(model_path)
         evalFolder = os.path.dirname(model_path)
         logFolder = os.path.dirname(self.model_folder)
         
@@ -477,12 +479,12 @@ class TestModule(Testing):
         if self.enable_openset == False:
             print(f"Closed set test accuracy: {testAcc}")
             with open(evalLogPath, "a") as f:
-                f.write(f"{datetime.now()}, {folder_name}, {os.path.basename(model_path)}, {testAcc}\n")
+                f.write(f"{datetime.now()}, {folder_name}, {model_name}, {testAcc}\n")
         else:
             print(f"Closed set test accuracy: {testAcc}")
             print(f"Open set AUROC: {testAuc}")
             with open(evalLogPath, "a") as f:
-                f.write(f"{datetime.now()}, {folder_name}, {os.path.basename(model_path)}, {testAcc}, {testAuc}\n")
+                f.write(f"{datetime.now()}, {folder_name}, {model_name}, {testAcc}, {testAuc}\n")
             
         print("Finish evaluation")
 

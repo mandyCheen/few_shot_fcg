@@ -23,7 +23,7 @@ class LoadDataset:
             self.val = opt["settings"]["train"]["validation"]
             self.splitByCpu = opt["dataset"]["split_by_cpu"]
             self.reverseTool = opt["dataset"]["reverse_tool"]
-            self.familyInTrain = opt["dataset"]["pretrain_family"]
+            self.familyInTrain = opt.get("dataset", {}).get("pretrain_family", [])
             splitByCpu = "_splitByCpu" if self.splitByCpu else ""
             val = "_withVal" if self.val else ""
             pretrain_ = "_withPretrain" if opt["pretrain"]["use"] else ""
