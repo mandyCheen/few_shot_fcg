@@ -16,7 +16,7 @@ date = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 for seed in seeds:
     print("seed: ", seed)
     for exp in expList:
-        options = load_config("config/config_i368_label_prop_openset_meta_nict_proc1.json")
+        options = load_config("config/config_i386_label_prop_openset_meta_nict_proc1.json")
         print("exp: ", exp)
         options["settings"]["name"] = exp+f"_LabelPropagation_alpha0.7_k20_gcn"
         shots = int(exp.split("_")[1].split("shot")[0])
@@ -28,7 +28,7 @@ for seed in seeds:
         options["settings"]["few_shot"]["train"]["class_per_iter"] = way
         options["settings"]["few_shot"]["test"]["class_per_iter"] = way
         options["settings"]["seed"] = seed
-        save_config(options, "config/config_i368_label_prop_openset_meta_nict_proc1.json")
+        save_config(options, "config/config_i386_label_prop_openset_meta_nict_proc1.json")
 
         dataset = LoadDataset(options)
         vectorizer = FCGVectorize(options, dataset)
