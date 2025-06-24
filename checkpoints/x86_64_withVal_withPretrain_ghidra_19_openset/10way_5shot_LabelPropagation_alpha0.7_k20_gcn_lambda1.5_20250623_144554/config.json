@@ -24,7 +24,7 @@
         "batch_size": 128
     },
     "settings": {
-        "name": "10way_5shot_LabelPropagation_alpha0.7_k20_gcn_lambda1.0_proc1",
+        "name": "10way_5shot_LabelPropagation_alpha0.7_k20_gcn_lambda1.5",
         "model": {
             "model_name": "GCN",
             "input_size": 128,
@@ -39,7 +39,7 @@
             "training": true,
             "validation": true,
             "num_epochs": 200,
-            "device": "cuda:1",
+            "device": "cuda:0",
             "parallel": false,
             "parallel_device": [],
             "iterations": 100,
@@ -91,7 +91,7 @@
                 "use": true,
                 "m_samples": 20,
                 "class_per_iter": 5,
-                "loss_weight": 1.0
+                "loss_weight": 1.5
             },
             "test": {
                 "use": true,
@@ -104,16 +104,16 @@
             "node_embedding_size": 128,
             "num_workers": 4
         },
-        "seed": 22
+        "seed": 19
     },
     "paths": {
         "data": {
-            "fcg_dataset": "../dataset/data_ghidra_fcg",
+            "fcg_dataset": "/mnt/ssd2t/mandy/Projects/few_shot_fcg/dataset/data_ghidra_fcg",
             "csv_folder": "../dataset/raw_csv",
             "split_folder": "../dataset/split",
-            "embedding_folder": "../embeddings",
+            "embedding_folder": "/mnt/ssd2t/mandy/Projects/few_shot_fcg/embeddings",
             "pretrain_dataset": "../dataset/data_ghidra_fcg_pretrain",
-            "openset_dataset": "../dataset/data_ghidra_fcg_openset"
+            "openset_dataset": "/mnt/ssd2t/mandy/Projects/few_shot_fcg/dataset/data_ghidra_fcg_openset"
         },
         "model": {
             "model_folder": "../checkpoints",
