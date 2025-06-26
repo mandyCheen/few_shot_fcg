@@ -14,24 +14,22 @@ seeds = [6, 7, 10, 42]
 date = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 arch = ["arm", "i386"]
 
-for a in arch:
-    print("Architecture: ", a)
-    for seed in seeds:
-        print("seed: ", seed)
-        for exp in expList:
-            options = load_config(f"config/config_{a}_label_prop_openset_meta_14.json")
-            print("exp: ", exp)
-            options["settings"]["name"] = exp+f"_relation_gcn"
-            shots = int(exp.split("_")[1].split("shot")[0])
-            way = int(exp.split("_")[0].split("way")[0])
-            options["settings"]["few_shot"]["train"]["support_shots"] = shots
-            options["settings"]["few_shot"]["train"]["query_shots"] = 20 - shots
-            options["settings"]["few_shot"]["test"]["support_shots"] = shots
-            options["settings"]["few_shot"]["test"]["query_shots"] = 20 - shots
-            options["settings"]["few_shot"]["train"]["class_per_iter"] = way
-            options["settings"]["few_shot"]["test"]["class_per_iter"] = way
-            options["settings"]["seed"] = seed
-            save_config(options, f"config/config_{a}_label_prop_openset_meta_14.json")
+for seed in seeds:
+    print("seed: ", seed)
+    for exp in expList:
+        options = load_config("config/config_arm_label_prop_openset_meta_nict_proc0.json")
+        print("exp: ", exp)
+        options["settings"]["name"] = exp+f"_SoftNnNet_gcn"
+        shots = int(exp.split("_")[1].split("shot")[0])
+        way = int(exp.split("_")[0].split("way")[0])
+        options["settings"]["few_shot"]["train"]["support_shots"] = shots
+        options["settings"]["few_shot"]["train"]["query_shots"] = 20 - shots
+        options["settings"]["few_shot"]["test"]["support_shots"] = shots
+        options["settings"]["few_shot"]["test"]["query_shots"] = 20 - shots
+        options["settings"]["few_shot"]["train"]["class_per_iter"] = way
+        options["settings"]["few_shot"]["test"]["class_per_iter"] = way
+        options["settings"]["seed"] = seed
+        save_config(options, "config/config_arm_label_prop_openset_meta_nict_proc0.json")
 
             dataset = LoadDataset(options)
             # vectorizer = FCGVectorize(options, dataset)
