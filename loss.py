@@ -1025,9 +1025,8 @@ class RelationNetwork(nn.Module, Loss):
 
         prototypes_ext = prototypes.unsqueeze(0).repeat(num_queries + num_open_samples, 1, 1) # [num_queries, num_support_classes, 128]
         query_samples_ext = query_samples.unsqueeze(1).repeat(1, num_support_classes, 1)  # [num_queries, num_support_classes, 128]
-
         relation_pairs = torch.cat([prototypes_ext, query_samples_ext], dim=2)  # [num_queries, num_support_classes, 256]
-        relation_pairs = relation_pairs.view(-1, 256)
+        relation_pairs = relation_pairs.view(-1, 2 * self.opt["settings"]["model"]["output_size"])
         # 通過 relation network 計算 relation scores
         self.relation.to(self.device)
         relations = self.relation(relation_pairs)  # [num_queries, 1]
