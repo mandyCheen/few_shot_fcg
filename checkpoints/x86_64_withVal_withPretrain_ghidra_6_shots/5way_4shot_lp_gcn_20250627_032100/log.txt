@@ -1,0 +1,394 @@
+Device: cuda:1
+Model: LabelPropagation(
+  (encoder): GCNLayer(
+    (gcn_convs): ModuleList(
+      (0): GCNConv(128, 256)
+      (1): GCNConv(256, 256)
+      (2): GCNConv(256, 128)
+    )
+    (norms): ModuleList(
+      (0-1): 2 x BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (2): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+  )
+  (relation): GraphRelationNetwork(
+    (block): GCNLayer(
+      (gcn_convs): ModuleList(
+        (0): GCNConv(128, 64)
+        (1): GCNConv(64, 32)
+      )
+      (norms): ModuleList(
+        (0): BatchNorm1d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (1): BatchNorm1d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (fc): Sequential(
+      (0): Linear(in_features=32, out_features=16, bias=True)
+      (1): ReLU()
+      (2): Linear(in_features=16, out_features=1, bias=True)
+    )
+  )
+)
+Loss function: LabelPropagation(
+  (encoder): GCNLayer(
+    (gcn_convs): ModuleList(
+      (0): GCNConv(128, 256)
+      (1): GCNConv(256, 256)
+      (2): GCNConv(256, 128)
+    )
+    (norms): ModuleList(
+      (0-1): 2 x BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (2): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+  )
+  (relation): GraphRelationNetwork(
+    (block): GCNLayer(
+      (gcn_convs): ModuleList(
+        (0): GCNConv(128, 64)
+        (1): GCNConv(64, 32)
+      )
+      (norms): ModuleList(
+        (0): BatchNorm1d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (1): BatchNorm1d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (fc): Sequential(
+      (0): Linear(in_features=32, out_features=16, bias=True)
+      (1): ReLU()
+      (2): Linear(in_features=16, out_features=1, bias=True)
+    )
+  )
+)
+Optimizer: Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    capturable: False
+    differentiable: False
+    eps: 1e-08
+    foreach: None
+    fused: None
+    lr: 0.001
+    maximize: False
+    weight_decay: 0
+)
+Start training...
+Epoch 1/200: Avg Train Loss: -1.9762, Avg Train Acc: 0.7591 (Best)
+Open-Set AUROC: 0.7456
+Epoch 1/200: Avg Val Loss: -2.0279, Avg Val Acc: 0.8666 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 0/20
+Epoch 2/200: Avg Train Loss: -2.0279, Avg Train Acc: 0.9300 (Best)
+Open-Set AUROC: 0.9378
+Epoch 2/200: Avg Val Loss: -2.0184, Avg Val Acc: 0.8941 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 0/20
+Epoch 3/200: Avg Train Loss: -2.0345, Avg Train Acc: 0.9226 (Best: 0.9300)
+Open-Set AUROC: 0.9416
+Epoch 3/200: Avg Val Loss: -2.0307, Avg Val Acc: 0.8963 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 0/20
+Epoch 4/200: Avg Train Loss: -2.0365, Avg Train Acc: 0.9428 (Best)
+Open-Set AUROC: 0.9466
+Epoch 4/200: Avg Val Loss: -2.0363, Avg Val Acc: 0.8825 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 1/20
+Epoch 5/200: Avg Train Loss: -2.0403, Avg Train Acc: 0.9365 (Best: 0.9428)
+Open-Set AUROC: 0.9493
+Epoch 5/200: Avg Val Loss: -2.0287, Avg Val Acc: 0.8676 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 2/20
+Epoch 6/200: Avg Train Loss: -2.0418, Avg Train Acc: 0.9391 (Best: 0.9428)
+Open-Set AUROC: 0.9506
+Epoch 6/200: Avg Val Loss: -2.0328, Avg Val Acc: 0.8724 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 3/20
+Epoch 7/200: Avg Train Loss: -2.0369, Avg Train Acc: 0.9230 (Best: 0.9428)
+Open-Set AUROC: 0.9378
+Epoch 7/200: Avg Val Loss: -2.0215, Avg Val Acc: 0.8791 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 4/20
+Epoch 8/200: Avg Train Loss: -2.0439, Avg Train Acc: 0.9291 (Best: 0.9428)
+Open-Set AUROC: 0.9531
+Epoch 8/200: Avg Val Loss: -2.0326, Avg Val Acc: 0.8455 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 5/20
+Epoch 9/200: Avg Train Loss: -2.0431, Avg Train Acc: 0.9425 (Best: 0.9428)
+Open-Set AUROC: 0.9557
+Epoch 9/200: Avg Val Loss: -2.0257, Avg Val Acc: 0.8829 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 6/20
+Epoch 10/200: Avg Train Loss: -2.0464, Avg Train Acc: 0.9415 (Best: 0.9428)
+Open-Set AUROC: 0.9579
+Epoch 10/200: Avg Val Loss: -2.0354, Avg Val Acc: 0.8891 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 7/20
+Epoch 11/200: Avg Train Loss: -2.0469, Avg Train Acc: 0.9328 (Best: 0.9428)
+Open-Set AUROC: 0.9519
+Epoch 11/200: Avg Val Loss: -2.0333, Avg Val Acc: 0.8713 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 8/20
+Epoch 12/200: Avg Train Loss: -2.0482, Avg Train Acc: 0.9453 (Best)
+Open-Set AUROC: 0.9674
+Epoch 12/200: Avg Val Loss: -2.0217, Avg Val Acc: 0.8631 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 9/20
+Epoch 13/200: Avg Train Loss: -2.0496, Avg Train Acc: 0.9510 (Best)
+Open-Set AUROC: 0.9630
+Epoch 13/200: Avg Val Loss: -2.0243, Avg Val Acc: 0.8960 (Best: 0.8963)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 10/20
+Epoch 14/200: Avg Train Loss: -2.0516, Avg Train Acc: 0.9558 (Best)
+Open-Set AUROC: 0.9692
+Epoch 14/200: Avg Val Loss: -2.0340, Avg Val Acc: 0.8989 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.001]
+Patience: 0/20
+Epoch 15/200: Avg Train Loss: -2.0457, Avg Train Acc: 0.9333 (Best: 0.9558)
+Open-Set AUROC: 0.9600
+Epoch 15/200: Avg Val Loss: -2.0278, Avg Val Acc: 0.8893 (Best: 0.8989)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 1/20
+Epoch 16/200: Avg Train Loss: -2.0501, Avg Train Acc: 0.9415 (Best: 0.9558)
+Open-Set AUROC: 0.9592
+Epoch 16/200: Avg Val Loss: -2.0259, Avg Val Acc: 0.8855 (Best: 0.8989)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 2/20
+Epoch 17/200: Avg Train Loss: -2.0504, Avg Train Acc: 0.9354 (Best: 0.9558)
+Open-Set AUROC: 0.9571
+Epoch 17/200: Avg Val Loss: -2.0361, Avg Val Acc: 0.8953 (Best: 0.8989)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 3/20
+Epoch 18/200: Avg Train Loss: -2.0525, Avg Train Acc: 0.9486 (Best: 0.9558)
+Open-Set AUROC: 0.9602
+Epoch 18/200: Avg Val Loss: -2.0300, Avg Val Acc: 0.9001 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 0/20
+Epoch 19/200: Avg Train Loss: -2.0499, Avg Train Acc: 0.9465 (Best: 0.9558)
+Open-Set AUROC: 0.9523
+Epoch 19/200: Avg Val Loss: -2.0352, Avg Val Acc: 0.8875 (Best: 0.9001)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 1/20
+Epoch 20/200: Avg Train Loss: -2.0544, Avg Train Acc: 0.9499 (Best: 0.9558)
+Open-Set AUROC: 0.9658
+Epoch 20/200: Avg Val Loss: -2.0318, Avg Val Acc: 0.8955 (Best: 0.9001)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 2/20
+Epoch 21/200: Avg Train Loss: -2.0534, Avg Train Acc: 0.9491 (Best: 0.9558)
+Open-Set AUROC: 0.9636
+Epoch 21/200: Avg Val Loss: -2.0268, Avg Val Acc: 0.8840 (Best: 0.9001)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 3/20
+Epoch 22/200: Avg Train Loss: -2.0523, Avg Train Acc: 0.9489 (Best: 0.9558)
+Open-Set AUROC: 0.9600
+Epoch 22/200: Avg Val Loss: -2.0264, Avg Val Acc: 0.8881 (Best: 0.9001)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 4/20
+Epoch 23/200: Avg Train Loss: -2.0541, Avg Train Acc: 0.9558 (Best: 0.9558)
+Open-Set AUROC: 0.9674
+Epoch 23/200: Avg Val Loss: -2.0327, Avg Val Acc: 0.8956 (Best: 0.9001)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 5/20
+Epoch 24/200: Avg Train Loss: -2.0523, Avg Train Acc: 0.9429 (Best: 0.9558)
+Open-Set AUROC: 0.9646
+Epoch 24/200: Avg Val Loss: -2.0316, Avg Val Acc: 0.9015 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 0/20
+Epoch 25/200: Avg Train Loss: -2.0502, Avg Train Acc: 0.9475 (Best: 0.9558)
+Open-Set AUROC: 0.9629
+Epoch 25/200: Avg Val Loss: -2.0359, Avg Val Acc: 0.9038 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.0005]
+Patience: 0/20
+Epoch 26/200: Avg Train Loss: -2.0553, Avg Train Acc: 0.9554 (Best: 0.9558)
+Open-Set AUROC: 0.9661
+Epoch 26/200: Avg Val Loss: -2.0350, Avg Val Acc: 0.8899 (Best: 0.9038)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 1/20
+Epoch 27/200: Avg Train Loss: -2.0553, Avg Train Acc: 0.9495 (Best: 0.9558)
+Open-Set AUROC: 0.9669
+Epoch 27/200: Avg Val Loss: -2.0326, Avg Val Acc: 0.9049 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 0/20
+Epoch 28/200: Avg Train Loss: -2.0576, Avg Train Acc: 0.9521 (Best: 0.9558)
+Open-Set AUROC: 0.9692
+Epoch 28/200: Avg Val Loss: -2.0276, Avg Val Acc: 0.8914 (Best: 0.9049)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 1/20
+Epoch 29/200: Avg Train Loss: -2.0564, Avg Train Acc: 0.9518 (Best: 0.9558)
+Open-Set AUROC: 0.9670
+Epoch 29/200: Avg Val Loss: -2.0349, Avg Val Acc: 0.8958 (Best: 0.9049)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 2/20
+Epoch 30/200: Avg Train Loss: -2.0569, Avg Train Acc: 0.9516 (Best: 0.9558)
+Open-Set AUROC: 0.9678
+Epoch 30/200: Avg Val Loss: -2.0346, Avg Val Acc: 0.8996 (Best: 0.9049)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 3/20
+Epoch 31/200: Avg Train Loss: -2.0554, Avg Train Acc: 0.9576 (Best)
+Open-Set AUROC: 0.9640
+Epoch 31/200: Avg Val Loss: -2.0249, Avg Val Acc: 0.8919 (Best: 0.9049)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 4/20
+Epoch 32/200: Avg Train Loss: -2.0544, Avg Train Acc: 0.9551 (Best: 0.9576)
+Open-Set AUROC: 0.9657
+Epoch 32/200: Avg Val Loss: -2.0319, Avg Val Acc: 0.8929 (Best: 0.9049)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 5/20
+Epoch 33/200: Avg Train Loss: -2.0568, Avg Train Acc: 0.9514 (Best: 0.9576)
+Open-Set AUROC: 0.9751
+Epoch 33/200: Avg Val Loss: -2.0358, Avg Val Acc: 0.9156 (Best)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 0/20
+Epoch 34/200: Avg Train Loss: -2.0554, Avg Train Acc: 0.9545 (Best: 0.9576)
+Open-Set AUROC: 0.9630
+Epoch 34/200: Avg Val Loss: -2.0298, Avg Val Acc: 0.8936 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 1/20
+Epoch 35/200: Avg Train Loss: -2.0568, Avg Train Acc: 0.9515 (Best: 0.9576)
+Open-Set AUROC: 0.9699
+Epoch 35/200: Avg Val Loss: -2.0303, Avg Val Acc: 0.8946 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 2/20
+Epoch 36/200: Avg Train Loss: -2.0573, Avg Train Acc: 0.9511 (Best: 0.9576)
+Open-Set AUROC: 0.9690
+Epoch 36/200: Avg Val Loss: -2.0302, Avg Val Acc: 0.8999 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.00025]
+Patience: 3/20
+Epoch 37/200: Avg Train Loss: -2.0581, Avg Train Acc: 0.9555 (Best: 0.9576)
+Open-Set AUROC: 0.9705
+Epoch 37/200: Avg Val Loss: -2.0275, Avg Val Acc: 0.8954 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 4/20
+Epoch 38/200: Avg Train Loss: -2.0569, Avg Train Acc: 0.9580 (Best)
+Open-Set AUROC: 0.9737
+Epoch 38/200: Avg Val Loss: -2.0314, Avg Val Acc: 0.8970 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 5/20
+Epoch 39/200: Avg Train Loss: -2.0533, Avg Train Acc: 0.9428 (Best: 0.9580)
+Open-Set AUROC: 0.9593
+Epoch 39/200: Avg Val Loss: -2.0352, Avg Val Acc: 0.8996 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 6/20
+Epoch 40/200: Avg Train Loss: -2.0581, Avg Train Acc: 0.9556 (Best: 0.9580)
+Open-Set AUROC: 0.9700
+Epoch 40/200: Avg Val Loss: -2.0327, Avg Val Acc: 0.9006 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 7/20
+Epoch 41/200: Avg Train Loss: -2.0608, Avg Train Acc: 0.9583 (Best)
+Open-Set AUROC: 0.9728
+Epoch 41/200: Avg Val Loss: -2.0294, Avg Val Acc: 0.8961 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 8/20
+Epoch 42/200: Avg Train Loss: -2.0590, Avg Train Acc: 0.9593 (Best)
+Open-Set AUROC: 0.9655
+Epoch 42/200: Avg Val Loss: -2.0276, Avg Val Acc: 0.8916 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 9/20
+Epoch 43/200: Avg Train Loss: -2.0584, Avg Train Acc: 0.9495 (Best: 0.9593)
+Open-Set AUROC: 0.9716
+Epoch 43/200: Avg Val Loss: -2.0348, Avg Val Acc: 0.9034 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 10/20
+Epoch 44/200: Avg Train Loss: -2.0559, Avg Train Acc: 0.9486 (Best: 0.9593)
+Open-Set AUROC: 0.9648
+Epoch 44/200: Avg Val Loss: -2.0312, Avg Val Acc: 0.8948 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 11/20
+Epoch 45/200: Avg Train Loss: -2.0574, Avg Train Acc: 0.9556 (Best: 0.9593)
+Open-Set AUROC: 0.9666
+Epoch 45/200: Avg Val Loss: -2.0343, Avg Val Acc: 0.9036 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 12/20
+Epoch 46/200: Avg Train Loss: -2.0598, Avg Train Acc: 0.9498 (Best: 0.9593)
+Open-Set AUROC: 0.9691
+Epoch 46/200: Avg Val Loss: -2.0322, Avg Val Acc: 0.8930 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 13/20
+Epoch 47/200: Avg Train Loss: -2.0606, Avg Train Acc: 0.9595 (Best)
+Open-Set AUROC: 0.9730
+Epoch 47/200: Avg Val Loss: -2.0272, Avg Val Acc: 0.9105 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.000125]
+Patience: 14/20
+Epoch 48/200: Avg Train Loss: -2.0580, Avg Train Acc: 0.9523 (Best: 0.9595)
+Open-Set AUROC: 0.9631
+Epoch 48/200: Avg Val Loss: -2.0305, Avg Val Acc: 0.8839 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.0001]
+Patience: 15/20
+Epoch 49/200: Avg Train Loss: -2.0589, Avg Train Acc: 0.9533 (Best: 0.9595)
+Open-Set AUROC: 0.9695
+Epoch 49/200: Avg Val Loss: -2.0291, Avg Val Acc: 0.8970 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.0001]
+Patience: 16/20
+Epoch 50/200: Avg Train Loss: -2.0584, Avg Train Acc: 0.9554 (Best: 0.9595)
+Open-Set AUROC: 0.9688
+Epoch 50/200: Avg Val Loss: -2.0294, Avg Val Acc: 0.9031 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.0001]
+Patience: 17/20
+Epoch 51/200: Avg Train Loss: -2.0561, Avg Train Acc: 0.9545 (Best: 0.9595)
+Open-Set AUROC: 0.9680
+Epoch 51/200: Avg Val Loss: -2.0263, Avg Val Acc: 0.8945 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.0001]
+Patience: 18/20
+Epoch 52/200: Avg Train Loss: -2.0575, Avg Train Acc: 0.9528 (Best: 0.9595)
+Open-Set AUROC: 0.9644
+Epoch 52/200: Avg Val Loss: -2.0315, Avg Val Acc: 0.8966 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.0001]
+Patience: 19/20
+Epoch 53/200: Avg Train Loss: -2.0572, Avg Train Acc: 0.9550 (Best: 0.9595)
+Open-Set AUROC: 0.9697
+Epoch 53/200: Avg Val Loss: -2.0308, Avg Val Acc: 0.8975 (Best: 0.9156)
+Open-Set AUROC: nan
+Current learning rate: [0.0001]
+Early stopping in epoch 53
+Finish training
