@@ -194,11 +194,11 @@ class Training:
                 for data in pbar:
                     data = data.to(self.device)
                     self.optim.zero_grad()
-                    if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork"):
+                    if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork", "MAML"):
                         loss, acc = self.model(data)
                     else:
                         predicts = self.model(data)
-                        loss, acc = self.loss_fn(predicts, data.y)        
+                        loss, acc = self.loss_fn(predicts, data.y)    
                     loss.backward()
                     self.optim.step()   
                     self.train_acc_history.append(acc.item())
@@ -235,7 +235,7 @@ class Training:
                     for data in pbar:
                         data = data.to(self.device)
                         with torch.no_grad():
-                            if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork"):
+                            if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork", "MAML"):
                                 loss, acc = self.model(data, opensetTesting=self.enable_openset)
                             else:
                                 model_output = self.model(data)
@@ -370,7 +370,7 @@ class Testing:
                     # print(np.unique(data.y))
                     data = data.to(self.device)
                     with torch.no_grad():
-                        if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork"):
+                        if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork", "MAML"):
                             loss, acc = testModel(data, opensetTesting=self.openset)
                             if self.openset:
                                 avg_auc.append(testModel.openset_auroc)

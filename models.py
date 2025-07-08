@@ -9,6 +9,8 @@ import numpy as np
 import pickle
 import torch.nn as nn
 
+#TODO: projection dimension bug
+
 class GCN(torch.nn.Module):
     def __init__(self, dim_in: int, dim_h: int, dim_out: int, num_layers: int, projection: bool = False):
         super().__init__()

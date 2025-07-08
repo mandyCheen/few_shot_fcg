@@ -5,7 +5,7 @@ import torch
 from torch_geometric.data import Data, Batch
 from loadDataset import LoadDataset
 from dataset import FcgSampler, OpenSetFcgSampler
-from models import GraphSAGE, GCN, GIN, GraphSAGELayer, GCNLayer, GATLayer, GINLayer
+from models import *
 from torch_geometric.loader import DataLoader
 from torch.utils.data import ConcatDataset
 from loss import *
@@ -82,6 +82,11 @@ class TrainModule(Training):
             if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
                 self.model = GraphSAGELayer(dim_in=info["input_size"], dim_h=info["hidden_size"], 
                                             dim_o=info["output_size"], num_layers=info["num_layers"])
+            elif self.opt["settings"]["few_shot"]["method"] == "MAML":
+                self.model = GraphClassifier(backbone_dim_in=info["input_size"], backbone_dim_h=info["hidden_size"],
+                                             backbone_dim_out=info["output_size"], backbone_num_layers=info["num_layers"], 
+                                            projection = info["projection"], num_classes=self.opt["settings"]["few_shot"]["train"]["class_per_iter"],
+                                            backbone_type='sage')
             else:
                 self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], 
                                        dim_out=info["output_size"], num_layers=info["num_layers"], 
@@ -90,6 +95,11 @@ class TrainModule(Training):
             if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
                 self.model = GCNLayer(dim_in=info["input_size"], dim_h=info["hidden_size"], 
                                       dim_o=info["output_size"], num_layers=info["num_layers"])
+            elif self.opt["settings"]["few_shot"]["method"] == "MAML":
+                self.model = GraphClassifier(backbone_dim_in=info["input_size"], backbone_dim_h=info["hidden_size"],
+                                             backbone_dim_out=info["output_size"], backbone_num_layers=info["num_layers"], 
+                                            projection = info["projection"], num_classes=self.opt["settings"]["few_shot"]["train"]["class_per_iter"],
+                                            backbone_type='gcn')
             else:
                 self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], 
                                 dim_out=info["output_size"], num_layers=info["num_layers"], 
@@ -184,6 +194,8 @@ class TrainModule(Training):
             loss_fn = MatchLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "RelationNetwork":
             loss_fn = RelationNetwork(self.opt, self.model)
+        elif self.opt["settings"]["few_shot"]["method"] == "MAML":
+            loss_fn = MAMLLoss(self.opt, self.model)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -250,7 +262,7 @@ class TrainModule(Training):
 
         self.get_backbone()
         self.get_loss_fn()
-        if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork"):
+        if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork", "MAML"):
             self.model = self.loss_fn
         self.get_optimizer()
         if self.lr_scheduler:
@@ -355,6 +367,8 @@ class TestModule(Testing):
             loss_fn = MatchLoss(self.opt)
         elif self.opt["settings"]["few_shot"]["method"] == "RelationNetwork":
             loss_fn = RelationNetwork(self.opt, self.model)
+        elif self.opt["settings"]["few_shot"]["method"] == "MAML":
+            loss_fn = MAMLLoss(self.opt, self.model)
         else:
             raise ValueError("Loss method not supported")
         self.loss_fn = loss_fn
@@ -364,12 +378,22 @@ class TestModule(Testing):
             self.pretrainModel = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
             if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
                 self.model = GraphSAGELayer(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_o=info["output_size"], num_layers=info["num_layers"])
+            elif self.opt["settings"]["few_shot"]["method"] == "MAML":
+                self.model = GraphClassifier(backbone_dim_in=info["input_size"], backbone_dim_h=info["hidden_size"],
+                                             backbone_dim_out=info["output_size"], backbone_num_layers=info["num_layers"], 
+                                            projection = info["projection"], num_classes=self.opt["settings"]["few_shot"]["test"]["class_per_iter"],
+                                            backbone_type='sage')
             else:
                 self.model = GraphSAGE(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
         elif info["model_name"] == "GCN":
             self.pretrainModel = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
             if self.opt["settings"]["few_shot"]["method"] == "LabelPropagation":
                 self.model = GCNLayer(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_o=info["output_size"], num_layers=info["num_layers"])
+            elif self.opt["settings"]["few_shot"]["method"] == "MAML":
+                self.model = GraphClassifier(backbone_dim_in=info["input_size"], backbone_dim_h=info["hidden_size"],
+                                             backbone_dim_out=info["output_size"], backbone_num_layers=info["num_layers"], 
+                                            projection = info["projection"], num_classes=self.opt["settings"]["few_shot"]["test"]["class_per_iter"],
+                                            backbone_type='gcn')
             else:
                 self.model = GCN(dim_in=info["input_size"], dim_h=info["hidden_size"], dim_out=info["output_size"], num_layers=info["num_layers"], projection = info["projection"])
         elif info["model_name"] == "GAT":
@@ -413,7 +437,7 @@ class TestModule(Testing):
         self.generate_model()
         self.get_loss_fn()
         
-        if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork"):
+        if self.opt["settings"]["few_shot"]["method"] in ("LabelPropagation", "RelationNetwork", "MAML"):
             self.model = self.loss_fn
 
         print("Finish setting up the testing module")

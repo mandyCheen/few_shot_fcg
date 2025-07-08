@@ -1,10 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import grad
+from collections import OrderedDict
 import numpy as np
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout
 from models import GraphRelationNetwork, MLPRelationModule
 from torch_geometric.nn import global_add_pool
+import copy
+from torch_geometric.data import Data, Batch
 
 class DistanceMetric:
     """Base class for distance metrics"""
@@ -1062,6 +1066,226 @@ class RelationNetwork(nn.Module, Loss):
         torch.cuda.empty_cache()
         return loss, acc
 
+class MAMLLoss(nn.Module, Loss):
+    """MAML Loss for Few-Shot Learning"""
+    
+    def __init__(self, opt: dict, encoder: nn.Module):
+        super(MAMLLoss, self).__init__()
+        self.metric_name = opt["settings"]["train"]["distance"]
+        self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
+        self.loss_fn_name = opt["settings"]["train"]["loss"]
+        self.device = opt["settings"]["train"]["device"]
+
+        self.first_order = opt.get("settings", {}).get("few_shot", {}).get("parameters", {}).get("first_order", False)
+        # Gradient clipping
+        self.grad_clip = opt.get("settings", {}).get("few_shot", {}).get("parameters", {}).get("grad_clip", None)
+
+        self.enable_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("use", False)
+        self.openset_m_samples = opt.get("settings", {}).get("openset", {}).get("test", {}).get("m_samples", 0)
+        self.cls_training_openset = opt.get("settings", {}).get("openset", {}).get("train", {}).get("class_per_iter", 0)
+        self.openset_loss_scale = opt.get("settings", {}).get("openset", {}).get("train", {}).get("loss_weight", 0.5)
+        
+        self.loss_functions = {
+            'CrossEntropyLoss': F.cross_entropy,
+            'MSE': F.mse_loss,
+            'smooth_l1': F.smooth_l1_loss
+        }
+        
+        if self.loss_fn_name not in self.loss_functions:
+            raise ValueError(f"Unsupported loss function: {self.loss_fn_name}. "
+                           f"Supported loss functions are: {list(self.loss_functions.keys())}")
+        
+        self.loss_fn = self.loss_functions[self.loss_fn_name]
+
+        self.opensetLoss = EntropyLoss()
+
+        self.encoder = encoder
+    
+        
+    def __call__(self, data, opensetTesting=False):
+
+        input = data
+        target = data.y
+
+        if opensetTesting:  # openset testing
+            num = len(target) - self.openset_m_samples
+            closed_target = target[:num]
+            classes, support_idxs, query_idxs = self.get_support_query_idxs(closed_target)
+            n_classes = len(torch.unique(closed_target))
+            num_open_samples = self.openset_m_samples
+            openset_idxs = torch.arange(len(target))[num:]
+            n_query = closed_target.eq(classes[0].item()).sum().item() - self.n_support
+        elif self.enable_openset:  # openset training
+            classes, support_idxs, query_idxs, openset_idxs = self.get_support_query_idxs(
+                target, openset=True, cls_openset=self.cls_training_openset)
+            n_classes = len(torch.unique(target)) - self.cls_training_openset
+            num_open_samples = len(openset_idxs)
+            n_query = (len(target) - num_open_samples - self.n_support * n_classes) / n_classes
+        else:  # closed set training & testing
+            classes, support_idxs, query_idxs = self.get_support_query_idxs(target)
+            n_classes = len(classes)
+            n_query = target.eq(classes[0].item()).sum().item() - self.n_support
+            num_open_samples = 0
+        # 原本: support_samples = torch.cat([input[idx_list] for idx_list in support_idxs])
+        support_graphs = []
+        for idx_list in support_idxs:
+            support_graphs.extend(self.extract_graphs_from_batch(input, idx_list))
+        support_samples = Batch.from_data_list(support_graphs)
+
+        # 原本: query_samples = input[query_idxs]
+        query_graphs = self.extract_graphs_from_batch(input, query_idxs)
+        query_samples = Batch.from_data_list(query_graphs)
+
+        # get support labels
+        support_targets = []
+        for class_idx, class_label in enumerate(classes):
+            support_targets.extend([class_idx] * self.n_support)
+        support_targets = torch.tensor(support_targets, dtype=torch.long).to(self.device)
+        # 準備目標標籤
+        query_targets = []
+        for class_idx, class_label in enumerate(classes):
+            query_targets.extend([class_idx] * n_query)
+        query_targets = torch.tensor(query_targets, dtype=torch.long).to(self.device)
+        
+        is_no_grad_mode = not torch.is_grad_enabled()
+        if is_no_grad_mode:
+            with torch.enable_grad():
+                self.encoder.train()
+                adapted_model, inner_losses = self.inner_loop_update(self.encoder, support_samples, support_targets)
+        else:
+            adapted_model, inner_losses = self.inner_loop_update(self.encoder, support_samples, support_targets)
+
+        if is_no_grad_mode:
+            adapted_model.eval()
+        query_logits = adapted_model(query_samples)
+        meta_loss = self.loss_fn(query_logits, query_targets)
+
+        query_prob = F.softmax(query_logits, dim=1)
+        predq = query_prob.argmax(dim=1)
+        correct = (predq == query_targets).float().sum()
+        acc = correct / len(query_targets)
+
+        if (self.enable_openset or opensetTesting) and num_open_samples > 0:
+            openset_graphs = self.extract_graphs_from_batch(input, openset_idxs)
+            openset_samples = Batch.from_data_list(openset_graphs)
+            openset_logits = adapted_model(openset_samples)
+
+            if self.enable_openset:
+                entropy_loss = self.opensetLoss.compute(openset_logits, dim=1)
+                open_loss = -entropy_loss 
+                meta_loss = meta_loss + self.openset_loss_scale * open_loss
+
+            query_max_probs = F.softmax(query_logits, dim=1).max(dim=1)[0]
+            openset_max_probs = F.softmax(openset_logits, dim=1).max(dim=1)[0]
+
+            all_scores = torch.cat([query_max_probs, openset_max_probs], dim=0)
+            closed_labels = torch.cat([
+                torch.ones(query_max_probs.size(0), device=self.device),
+                -torch.ones(openset_max_probs.size(0), device=self.device)
+            ], dim=0)
+
+            self.openset_auroc = self.roc_area_calc(all_scores, closed_labels, descending=False)
+
+        torch.cuda.empty_cache()
+
+        return meta_loss, acc
+
+    def inner_loop_update(self, model, support_input, support_target):
+        """執行inner loop的梯度更新"""
+        # 創建模型的副本用於更新
+        adapted_model = self.create_adapted_model(model)
+        inner_losses = []
+        
+        for step in range(10):
+            # 前向傳播
+            support_output = adapted_model(support_input)
+            inner_loss = self.loss_fn(support_output, support_target)
+            inner_losses.append(inner_loss.item())
+            
+            # 計算梯度
+            if self.first_order:
+                # 一階近似：不計算二階梯度
+                grads = torch.autograd.grad(
+                    inner_loss, adapted_model.parameters(), 
+                    create_graph=False, retain_graph=False
+                )
+            else:
+                # 二階梯度：保持計算圖
+                grads = torch.autograd.grad(
+                    inner_loss, adapted_model.parameters(), 
+                    create_graph=True, retain_graph=True
+                )
+            
+            # 梯度裁剪
+            if self.grad_clip is not None:
+                grads = [torch.clamp(g, -self.grad_clip, self.grad_clip) for g in grads]
+            
+            # 更新參數
+            with torch.no_grad():
+                for param, grad in zip(adapted_model.parameters(), grads):
+                    if grad is not None:
+                        param.data = param.data - 0.05 * grad
+        
+        return adapted_model, inner_losses
+    
+    def create_adapted_model(self, model):
+        """創建一個可以進行內層更新的模型副本"""
+        # 深度複製模型
+        adapted_model = copy.deepcopy(model)
+        
+        # 確保所有參數都需要梯度
+        for param in adapted_model.parameters():
+            param.requires_grad = True
+            
+        return adapted_model
+    
+    def extract_graphs_from_batch(self, data_batch, graph_indices):
+        """從DataBatch中提取指定索引的圖"""
+        graphs = []
+        
+        for graph_idx in graph_indices:
+            # 找到屬於這個圖的節點
+            node_mask = data_batch.batch == graph_idx
+            node_indices = torch.where(node_mask)[0]
+            
+            # 提取節點特徵
+            x = data_batch.x[node_mask]
+            
+            # 提取邊索引並重新編號
+            edge_mask = node_mask[data_batch.edge_index[0]] & node_mask[data_batch.edge_index[1]]
+            edge_index = data_batch.edge_index[:, edge_mask]
+            
+            # 重新編號節點索引 (從0開始)
+            node_mapping = torch.zeros(data_batch.x.size(0), dtype=torch.long, device=data_batch.x.device)
+            node_mapping[node_indices] = torch.arange(len(node_indices), device=data_batch.x.device)
+            edge_index = node_mapping[edge_index]
+            
+            # 創建單個圖的Data物件
+            graph_data = Data(
+                x=x,
+                edge_index=edge_index,
+                y=data_batch.y[graph_idx] if hasattr(data_batch, 'y') else None,
+                label=data_batch.label[graph_idx] if hasattr(data_batch, 'label') else None
+            )
+            graphs.append(graph_data)
+        
+        return graphs
+
+    def get_inner_lr(self):
+        """返回內層學習率"""
+        return self.inner_lr
+    
+    def get_num_inner_updates(self):
+        """返回內層更新步數"""
+        return self.num_inner_updates
+    
+    def set_inner_lr(self, new_lr):
+        """設置新的內層學習率"""
+        self.inner_lr = new_lr
+    
+    def get_loss_fn_name(self):
+        """返回當前使用的損失函數名稱"""
+        return self.loss_fn_name
 class ClassifierLoss(Loss):
     def __init__(self, opt: dict):
         self.n_support = opt["settings"]["few_shot"]["train"]["support_shots"]
@@ -1076,7 +1300,7 @@ class ClassifierLoss(Loss):
         
         super().__init__(self.n_support)
         
-    def __call__(self, input, target):
+    def __call__(self, model, input, target):
         target_cpu = target.cpu()
         input_cpu = input.cpu()
         
