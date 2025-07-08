@@ -10,7 +10,7 @@ import os, torch
 warnings.filterwarnings("ignore")
 
 expList = ["5way_1shot", "5way_2shot", "5way_3shot", "5way_4shot", "5way_6shot", "5way_7shot", "5way_8shot", "5way_9shot",]
-seeds = [31] 
+seeds = [31, 42] 
 date = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
 for seed in seeds:
@@ -18,9 +18,10 @@ for seed in seeds:
     for exp in expList:
         options = load_config("config/config_label_prop_openset_meta_nict_proc2.json")
         print("exp: ", exp)
-        options["settings"]["name"] = exp+f"_lp_gcn"
+        options["settings"]["name"] = exp+f"_Nn_gcn"
         shots = int(exp.split("_")[1].split("shot")[0])
         way = int(exp.split("_")[0].split("way")[0])
+        options["settings"]["few_shot"]["method"] = "NnNet"
         options["settings"]["few_shot"]["train"]["support_shots"] = shots
         options["settings"]["few_shot"]["train"]["query_shots"] = 20 - shots
         options["settings"]["few_shot"]["test"]["support_shots"] = shots
